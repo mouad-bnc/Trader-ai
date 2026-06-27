@@ -7,11 +7,12 @@ from typing import Iterable
 import pandas as pd
 import streamlit as st
 
-from coingecko import DEFAULT_COINS, CoinGeckoClient, MarketCoin, markets_to_frame
+from services.market_service import DEFAULT_COINS, MarketCoin, MarketService
 from components.badges import score_badge
 from components.cards import coin_logo, render_holding_card as component_holding_card, render_market_card as component_market_card
-from portfolio_analytics import enrich_portfolio, format_money, format_pct, recommendation_for, triggered_alerts
-from portfolio_io import empty_portfolio, normalize_portfolio, parse_binance_spot_csv
+from portfolio_analytics import format_money, format_pct, recommendation_for
+from services.news_service import NewsService
+from services.portfolio_service import PortfolioService
 from pages.bots import render_bots
 from pages.calculator import render_calculator
 from pages.home import render_home
@@ -100,32 +101,6 @@ def one_sentence_summary(article: dict[str, object]) -> str:
 
 
 
-@st.cache_data(ttl=900, show_spinner=False)
-def fear_greed() -> tuple[int | None, str]:
-    """Read the public Fear & Greed index instead of inventing a value."""
-    try:
-        import requests
-        response = requests.get("https://api.alternative.me/fng/", params={"limit": 1, "format": "json"}, timeout=8)
-        response.raise_for_status()
-        payload = response.json()
-        latest = (payload.get("data") or [{}])[0]
-        return int(latest.get("value")), str(latest.get("value_classification") or "Marché")
-    except Exception:
-        return None, "Indisponible"
-
-
-def btc_dominance(markets: list[MarketCoin]) -> float:
-    total = sum(max(coin.market_cap, 0) for coin in markets)
-    btc = next((coin.market_cap for coin in markets if coin.coin_id == "bitcoin"), 0)
-    return (btc / total * 100) if total else 0
-
-
-def segment_allocation(total: float) -> dict[str, float]:
-    if total <= 0:
-        return {"Spot": 0, "Earn": 0, "Bots": 0}
-    return {"Spot": total * .72, "Earn": total * .18, "Bots": total * .10}
-
-
 def signal_label(score: int) -> str:
     if score >= 78: return "Acheter"
     if score >= 64: return "Renforcer"
@@ -172,8 +147,10 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-client = CoinGeckoClient()
-default_state = {"portfolio": empty_portfolio(), "watchlist": ["bitcoin", "ethereum", "solana"], "screen": "Accueil", "currency": "USD", "theme": "Premium Dark", "refresh_interval": "90 secondes"}
+market_service = MarketService()
+portfolio_service = PortfolioService()
+news_service = NewsService()
+default_state = {"portfolio": portfolio_service.empty(), "watchlist": ["bitcoin", "ethereum", "solana"], "screen": "Accueil", "currency": "USD", "theme": "Premium Dark", "refresh_interval": "90 secondes"}
 for key, value in default_state.items():
     if key not in st.session_state:
         st.session_state[key] = value
@@ -183,7 +160,7 @@ with st.sidebar:
     uploaded = st.file_uploader("Importer un CSV Spot", type=["csv"], help="Import éducatif uniquement. Aucune clé API ni exécution.")
     if uploaded is not None:
         try:
-            imported = parse_binance_spot_csv(uploaded)
+            imported = portfolio_service.import_csv(uploaded)
             if st.button("Utiliser le portefeuille importé", type="primary", use_container_width=True):
                 st.session_state.portfolio = imported
                 st.success(f"Importé {len(imported)} actifs.")
@@ -199,46 +176,41 @@ with st.sidebar:
 coin_ids = [coin.strip().lower() for coin in coin_ids_text.replace("\n", ",").split(",") if coin.strip()]
 if include_trending:
     try:
-        coin_ids.extend(client.trending_ids())
+        coin_ids.extend(market_service.trending_ids())
     except Exception:
         st.sidebar.warning("Les tendances CoinGecko sont momentanément indisponibles.")
 coin_ids = list(dict.fromkeys(coin_ids))
 
-@st.cache_data(ttl=90, show_spinner=False)
-def load_markets(ids: tuple[str, ...], currency: str) -> pd.DataFrame:
-    return markets_to_frame(client.fetch_markets(ids, currency=currency.lower()))
-
 try:
     if refresh:
-        load_markets.clear()
-    market_df = load_markets(tuple(coin_ids), st.session_state.currency)
+        market_service.clear_cache()
+    market_df = market_service.prices(tuple(coin_ids), st.session_state.currency)
 except Exception:
     st.warning("Les données CoinGecko sont momentanément indisponibles. Réessaie dans quelques instants.")
     st.stop()
 if market_df.empty:
     st.warning("Ajoute des IDs CoinGecko valides pour commencer."); st.stop()
 
-market_objects = [MarketCoin(**row.to_dict()) for _, row in market_df.iterrows()]
-market_lookup = {coin.coin_id: coin for coin in market_objects}
+market_objects = market_service.market_objects(market_df)
+market_lookup = market_service.market_lookup(market_objects)
 market_ids = [coin.coin_id for coin in market_objects]
-st.session_state.portfolio = normalize_portfolio(st.session_state.portfolio)
-portfolio = enrich_portfolio(st.session_state.portfolio, market_objects)
-total_value = float(portfolio["value"].sum()) if not portfolio.empty else 0.0
-total_cost = float(portfolio["cost_basis"].sum()) if not portfolio.empty else 0.0
-total_pnl = total_value - total_cost
-total_pnl_pct = (total_pnl / total_cost * 100) if total_cost else 0.0
-daily_pnl = sum(float(row["value"]) * (float(market_lookup[row["coin_id"]].price_change_24h_pct) / 100) for _, row in portfolio.iterrows() if row["coin_id"] in market_lookup)
-daily_pnl_pct = (daily_pnl / max(total_value - daily_pnl, 1) * 100) if total_value else 0.0
-alerts = triggered_alerts(st.session_state.portfolio, market_objects)
-fav_ids = set(st.session_state.portfolio.loc[st.session_state.portfolio["favorite"], "coin_id"]) if not st.session_state.portfolio.empty else set()
-best_row = portfolio.sort_values("pnl_pct", ascending=False).head(1) if not portfolio.empty else pd.DataFrame()
-worst_row = portfolio.sort_values("pnl_pct", ascending=True).head(1) if not portfolio.empty else pd.DataFrame()
+st.session_state.portfolio = portfolio_service.load(st.session_state.portfolio)
+portfolio_data = portfolio_service.build_data(st.session_state.portfolio, market_objects, market_lookup)
+portfolio = portfolio_data.holdings
+total_value = portfolio_data.total_value
+total_pnl = portfolio_data.total_pnl
+total_pnl_pct = portfolio_data.total_pnl_pct
+daily_pnl = portfolio_data.daily_pnl
+daily_pnl_pct = portfolio_data.daily_pnl_pct
+fav_ids = portfolio_data.favorite_ids
+best_row = portfolio_data.best_row
+worst_row = portfolio_data.worst_row
 
 st.markdown(f"<div class='app-shell'><div class='topbar'><span class='icon-btn'>☰</span><div class='brand'>{html.escape(APP_NAME)}</div><div class='nav-icons'><span class='icon-btn'>🔔</span><span class='icon-btn'>👤</span></div></div></div>", unsafe_allow_html=True)
 screen = st.radio("Navigation", SECTIONS, horizontal=True, label_visibility="collapsed", key="screen")
-fng_value, fng_label = fear_greed()
-dominance = btc_dominance(market_objects)
-segments = segment_allocation(total_value)
+fng_value, fng_label = market_service.fear_greed()
+dominance = market_service.btc_dominance(market_objects)
+segments = portfolio_service.segment_allocation(total_value)
 fng_display = f"{fng_value}/100" if fng_value is not None else "Indisponible"
 
 
@@ -259,6 +231,7 @@ SCREEN_RENDERERS = {
         fng_label=fng_label,
         pct_class=pct_class,
         sparkline_svg=sparkline_svg,
+        binance_configured=portfolio_service.binance_configured,
     ),
     "Marchés": lambda: render_markets(
         market_objects=market_objects,
@@ -275,11 +248,11 @@ SCREEN_RENDERERS = {
         market_lookup=market_lookup,
         pct_class=pct_class,
         render_holding_card=render_holding_card,
+        portfolio_service=portfolio_service,
     ),
     "Bots": render_bots,
     "Actualités": lambda: render_news(
-        client=client,
-        demo_news=demo_news,
+        news_service=news_service,
         one_sentence_summary=one_sentence_summary,
     ),
     "Calculateur": lambda: render_calculator(pct_class=pct_class),

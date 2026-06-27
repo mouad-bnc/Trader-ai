@@ -15,4 +15,4 @@ dependencies = [
 ]
 
 [tool.setuptools]
-py-modules = ["analytics", "coingecko", "sample_data", "portfolio_io"]
+py-modules = ["analytics", "portfolio_analytics", "coingecko", "sample_data", "portfolio_io"]

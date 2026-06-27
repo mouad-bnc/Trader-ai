@@ -17,6 +17,7 @@ APP_VERSION = "5.0"
 GOLD = "#F3BA2F"
 GREEN = "#02C076"
 RED = "#F6465D"
+SECTIONS = ["Accueil", "Marchés", "Portefeuille", "Bots", "Actualités", "Calculateur", "Opportunités", "Trader IA"]
 
 st.set_page_config(page_title=f"{APP_NAME} {APP_VERSION}", page_icon="✦", layout="centered", initial_sidebar_state="collapsed")
 
@@ -251,14 +252,13 @@ best_row = portfolio.sort_values("pnl_pct", ascending=False).head(1) if not port
 worst_row = portfolio.sort_values("pnl_pct", ascending=True).head(1) if not portfolio.empty else pd.DataFrame()
 
 st.markdown(f"<div class='app-shell'><div class='topbar'><span class='icon-btn'>☰</span><div class='brand'>{html.escape(APP_NAME)}</div><div class='nav-icons'><span class='icon-btn'>🔔</span><span class='icon-btn'>👤</span></div></div></div>", unsafe_allow_html=True)
-sections = ["Accueil", "Marchés", "Wallet", "Bots", "News", "Calculateur", "Opportunités", "IA"]
-screen = st.radio("Navigation", sections, horizontal=True, label_visibility="collapsed", key="screen")
+screen = st.radio("Navigation", SECTIONS, horizontal=True, label_visibility="collapsed", key="screen")
 fng_value, fng_label = fear_greed()
 dominance = btc_dominance(market_objects)
 segments = segment_allocation(total_value)
 fng_display = f"{fng_value}/100" if fng_value is not None else "Indisponible"
 
-if screen == "Accueil":
+def render_home() -> None:
     st.markdown("<div class='hero'><p>Bonjour Mouad 👋</p><h1>Votre cockpit crypto</h1></div>", unsafe_allow_html=True)
     top_gain = best_row.iloc[0] if not best_row.empty else None
     top_loss = worst_row.iloc[0] if not worst_row.empty else None
@@ -280,7 +280,9 @@ if screen == "Accueil":
     else:
         st.markdown(f"<section class='glass-card'><div class='quick-grid'><div class='mini-stat'><span>Spot</span><b>{format_money(total_value)}</b></div><div class='mini-stat'><span>Actifs</span><b>{len(portfolio)}</b></div><div class='mini-stat'><span>PnL</span><b class='{pct_class(total_pnl)}'>{format_pct(total_pnl_pct)}</b></div></div><div class='metric-grid'><span>Top gain <b class='positive'>{gain_txt}</b></span><span>Top perte <b class='negative'>{loss_txt}</b></span><span>Fear & Greed <b>{fng_display}<br>{fng_label}</b></span></div></section>", unsafe_allow_html=True)
 
-elif screen == "Marchés":
+
+
+def render_markets() -> None:
     st.markdown(f"<section class='glass-card'><div class='section-head'><h2>Marchés</h2><span class='muted'>Fear & Greed {fng_display} · BTC {dominance:.1f}%</span></div></section>", unsafe_allow_html=True)
     query = st.text_input("Recherche crypto", placeholder="BTC, ETH, SOL…")
     filtered = [c for c in market_objects if not query or query.lower() in c.name.lower() or query.upper() in c.symbol]
@@ -291,7 +293,9 @@ elif screen == "Marchés":
     st.markdown("<h3>Liste de suivi</h3>", unsafe_allow_html=True)
     for coin in [c for c in filtered if c.coin_id in st.session_state.watchlist][:5]: render_market_card(coin, favorite=True)
 
-elif screen == "Wallet":
+
+
+def render_portfolio() -> None:
     binance = BinanceReadOnlyClient()
     if portfolio.empty:
         st.markdown("<section class='empty-card'><div class='empty-icon'>◒</div><h2>Votre portefeuille est prêt.</h2><p class='muted'>Connectez Binance ou ajoutez une position pour afficher la valeur totale, l'allocation, le donut et la liste des actifs.</p></section>", unsafe_allow_html=True)
@@ -320,10 +324,14 @@ elif screen == "Wallet":
                 st.session_state.portfolio = normalize_portfolio(pd.concat([st.session_state.portfolio[st.session_state.portfolio["coin_id"] != coin_id], next_row], ignore_index=True)); st.rerun()
     for _, row in portfolio.iterrows(): render_holding_card(row, market_lookup.get(str(row['coin_id'])))
 
-elif screen == "Bots":
+
+
+def render_bots() -> None:
     st.markdown("<section class='empty-card'><div class='empty-icon'>⌘</div><h2>Bots</h2><p class='muted'>Aucun bot connecté. Les performances réelles s'afficheront uniquement après connexion d'une source de données.</p></section>", unsafe_allow_html=True)
 
-elif screen == "News":
+
+
+def render_news() -> None:
     @st.cache_data(ttl=300, show_spinner=False)
     def load_news() -> list[dict[str, object]]: return client.fetch_news(per_page=10)
     try: articles = load_news() or demo_news()
@@ -337,7 +345,9 @@ elif screen == "News":
         source = html.escape(str(article.get('source') or article.get('source_name') or 'Source crypto'))
         st.markdown(f"<article class='news-card'><div class='news-img'{image_style}></div><span class='eyebrow'>{source}</span><h3>{html.escape(str(article.get('title') or 'Actualité crypto'))}</h3><p class='muted'>{html.escape(str(article.get('date') or article.get('created_at') or 'Maintenant'))}</p><p>{html.escape(one_sentence_summary(article))}</p><div class='badge-row'>{''.join(f'<em>{html.escape(str(t))}</em>' for t in tags)}</div></article>", unsafe_allow_html=True)
 
-elif screen == "Calculateur":
+
+
+def render_calculator() -> None:
     st.markdown("<section class='glass-card'><h2>Calculateur</h2><p class='muted'>Résultat instantané.</p></section>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     capital = c1.number_input("Capital", min_value=0.0, value=1000.0)
@@ -352,13 +362,17 @@ elif screen == "Calculateur":
     risk = max(avg - stop, 0); reward = max(sortie - avg, 0)
     st.markdown(f"<section class='portfolio-card'><div class='metric-grid'><span>Prix moyen <b>{format_money(avg)}</b></span><span>DCA <b>{format_money(dca)}</b></span><span>ROI <b class='{pct_class(roi)}'>{format_pct(roi)}</b></span><span>Ratio risque/rendement <b>{(reward/risk if risk else 0):.2f}</b></span><span>Taille position <b>{qty:.6f}</b></span><span>Seuil de protection <b>{format_money(stop)}</b></span></div></section>", unsafe_allow_html=True)
 
-elif screen == "Opportunités":
+
+
+def render_opportunities() -> None:
     st.markdown("<section class='glass-card'><h2>Opportunités</h2><p class='notice'>Analyse indicative uniquement.</p></section>", unsafe_allow_html=True)
     for coin in sorted(market_objects, key=lambda c: recommendation_for(c).opportunity_score, reverse=True)[:12]:
         rec = recommendation_for(coin); conf = confidence_for(coin)
         st.markdown(f"<article class='coin-card'><div class='coin-row'><div class='coin-title'>{coin_logo(coin, coin.symbol)}<div><h3>{coin.name}</h3><p>{coin.symbol}</p></div></div>{score_badge(rec.opportunity_score)}</div><div class='metric-grid'><span>Signal <b>{signal_label(rec.opportunity_score)}</b></span><span>Confiance <b>{conf}%</b></span><span>Prix <b>{format_money(coin.current_price)}</b></span></div><p class='muted'>{html.escape(rec.rationale)}</p></article>", unsafe_allow_html=True)
 
-else:
+
+
+def render_trader_ai() -> None:
     if "messages" not in st.session_state:
         st.session_state.messages = [{"role": "bot", "text": "Bonjour Mouad 👋\n\nJe suis Trader.\n\nJe peux analyser :\n• ton portefeuille\n• le marché\n• une crypto\n• les news\n• les opportunités."}]
     for msg in st.session_state.messages:
@@ -371,3 +385,17 @@ else:
         st.session_state.messages.append({"role":"user","text":prompt})
         st.session_state.messages.append({"role":"bot","text":f"Analyse indicative : {best.name} obtient le meilleur score actuel ({recommendation_for(best).opportunity_score}/100). Vérifie toujours ton risque, ton prix moyen et ton stop avant toute décision."})
         st.rerun()
+
+
+SCREEN_RENDERERS = {
+    "Accueil": render_home,
+    "Marchés": render_markets,
+    "Portefeuille": render_portfolio,
+    "Bots": render_bots,
+    "Actualités": render_news,
+    "Calculateur": render_calculator,
+    "Opportunités": render_opportunities,
+    "Trader IA": render_trader_ai,
+}
+
+SCREEN_RENDERERS[screen]()

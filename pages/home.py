@@ -38,6 +38,7 @@ def render_home(
     **_ignored_kwargs,
 ) -> None:
     st.markdown("<div class='hero'><p>Bonjour Mouad 👋</p><h1>Votre cockpit crypto</h1></div>", unsafe_allow_html=True)
+    market_objects = market_objects or []
     dominance_value = _safe_number(dominance, 0.0)
     top_gain = best_row.iloc[0] if best_row is not None and not best_row.empty else None
     top_loss = worst_row.iloc[0] if worst_row is not None and not worst_row.empty else None

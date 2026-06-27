@@ -7,7 +7,7 @@ import streamlit as st
 from components.ui import render_empty_card
 
 
-def render_news(*, news_service, one_sentence_summary) -> None:
+def render_news(*, news_service, one_sentence_summary, **_ignored_kwargs) -> None:
     try: articles = news_service.latest(per_page=10) or news_service.empty_news()
     except Exception: articles = news_service.empty_news()
     if not articles:

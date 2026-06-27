@@ -10,7 +10,7 @@ from components.ui import render_empty_card
 from portfolio_analytics import format_money, format_pct
 
 
-def render_portfolio(*, portfolio, total_value: float, total_pnl: float, total_pnl_pct: float, market_ids, market_lookup, pct_class, render_holding_card, portfolio_service, connection_status: str, connection_message: str, last_sync: str | None) -> None:
+def render_portfolio(*, portfolio, total_value: float, total_pnl: float, total_pnl_pct: float, market_ids, market_lookup, pct_class, render_holding_card, portfolio_service, connection_status: str, connection_message: str, last_sync: str | None, **_ignored_kwargs) -> None:
     if portfolio.empty:
         render_empty_card("◒", "Votre portefeuille est prêt.", "Connectez Binance ou ajoutez une position pour afficher la valeur totale, l'allocation, le donut et la liste des actifs.")
     else:

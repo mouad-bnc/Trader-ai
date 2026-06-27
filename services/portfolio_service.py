@@ -76,7 +76,7 @@ class PortfolioService:
                 portfolio=self.empty(),
                 synced_at=None,
                 connection_status="not_configured",
-                message="Connexion Binance non configurée",
+                message="Connexion Binance non configurée.",
             )
 
         try:
@@ -121,6 +121,12 @@ class PortfolioService:
             connection_status="connected",
             message="Portefeuille Binance synchronisé",
         )
+
+
+    def sync_portfolio(self) -> BinanceSyncResult:
+        """Alias de compatibilité pour les anciens appels de synchronisation Binance."""
+
+        return self.sync_binance_portfolio()
 
     def _sync_error(self, status: str, message: str) -> BinanceSyncResult:
         return BinanceSyncResult(portfolio=self.empty(), synced_at=None, connection_status=status, message=message)
@@ -171,4 +177,10 @@ def sync_binance_portfolio(binance_client: BinanceReadOnlyClient | None = None) 
     return PortfolioService(binance_client).sync_binance_portfolio()
 
 
-__all__ = ["BinanceSyncResult", "PortfolioData", "PortfolioService", "sync_binance_portfolio"]
+def sync_portfolio(binance_client: BinanceReadOnlyClient | None = None) -> BinanceSyncResult:
+    """Alias de compatibilité pour les anciens appels de synchronisation Binance."""
+
+    return sync_binance_portfolio(binance_client)
+
+
+__all__ = ["BinanceSyncResult", "PortfolioData", "PortfolioService", "sync_binance_portfolio", "sync_portfolio"]

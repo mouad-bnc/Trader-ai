@@ -216,17 +216,21 @@ if include_trending:
         st.sidebar.warning("Les tendances CoinGecko sont momentanément indisponibles.")
 coin_ids = list(dict.fromkeys(coin_ids))
 
+market_data_unavailable = False
 try:
     if refresh:
         market_service.clear_cache()
     market_df = market_service.prices(tuple(coin_ids), st.session_state.currency)
 except Exception:
-    st.warning("Les données CoinGecko sont momentanément indisponibles. Réessaie dans quelques instants.")
-    st.stop()
-if market_df.empty:
-    st.warning("Ajoute des IDs CoinGecko valides pour commencer."); st.stop()
+    market_data_unavailable = True
+    market_df = pd.DataFrame()
 
-market_objects = market_service.market_objects(market_df)
+if market_df.empty:
+    market_data_unavailable = True
+    market_objects = []
+    st.session_state.watchlist = []
+else:
+    market_objects = market_service.market_objects(market_df)
 market_lookup = market_service.market_lookup(market_objects)
 market_ids = [coin.coin_id for coin in market_objects]
 st.session_state.portfolio = portfolio_service.load(st.session_state.portfolio)
@@ -242,6 +246,8 @@ best_row = portfolio_data.best_row
 worst_row = portfolio_data.worst_row
 
 st.markdown(f"<div class='app-shell'><div class='topbar'><span class='icon-btn'>☰</span><div class='brand'>{html.escape(APP_NAME)}</div><div class='nav-icons'><span class='icon-btn'>🔔</span><span class='icon-btn'>👤</span></div></div></div>", unsafe_allow_html=True)
+if market_data_unavailable:
+    st.warning("Les données CoinGecko sont momentanément indisponibles.")
 screen = st.radio("Navigation", SECTIONS, horizontal=True, label_visibility="collapsed", key="screen")
 fng_value, fng_label = market_service.fear_greed()
 dominance = market_service.btc_dominance(market_objects)

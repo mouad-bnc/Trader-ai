@@ -1,5 +1,0 @@
-{
-  "watchlist": ["bitcoin", "solana", "sui", "dogecoin"],
-  "refresh_seconds": 60,
-  "default_budget_usdt": 100
-}

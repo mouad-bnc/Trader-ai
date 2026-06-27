@@ -1,55 +1,61 @@
-# Trader AI v1
+# Trader AI
 
-Mini application web locale pour analyser BTC, SOL, SUI et DOGE via les données publiques Binance Spot.
+**Version:** 0.1
 
-## Important
+Trader AI is a clean, production-ready Streamlit crypto dashboard built from scratch. It uses the public CoinGecko API only, requires no API keys, and never connects to Binance or any exchange account.
 
-- Aucun ordre Binance.
-- Aucune clé API.
-- Aucun trading automatique.
-- Analyse éducative uniquement.
+## Features
 
-## Installation
+- Dark modern Streamlit UI with responsive layout for desktop and mobile.
+- CoinGecko-only market dashboard.
+- Manual editable portfolio.
+- Live portfolio value.
+- Unrealized P&L and P&L percentage.
+- Allocation breakdown.
+- Opportunity score for tracked coins.
+- Recommendation engine with clear rationale.
+- No Binance API, no API keys, and no automated trading.
 
-Ouvre le dossier dans VS Code, puis lance :
+## Project structure
 
-```bash
-pip install -r requirements.txt
+```text
+.
+├── app.py
+├── requirements.txt
+├── README.md
+├── .streamlit/
+│   └── config.toml
+└── src/
+    └── trader_ai/
+        ├── __init__.py
+        ├── analytics.py
+        ├── coingecko.py
+        └── sample_data.py
 ```
 
-## Lancer l'application web
+## Install
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+pip install -e .
+```
+
+## Run
 
 ```bash
 streamlit run app.py
 ```
 
-Ensuite, ton navigateur va ouvrir une page locale du type :
+Open the local URL shown by Streamlit, typically `http://localhost:8501`.
 
-```text
-http://localhost:8501
-```
+## Usage notes
 
-## Lancer la version terminal
+1. Enter CoinGecko coin IDs in the sidebar, such as `bitcoin`, `ethereum`, or `solana`.
+2. Edit the manual portfolio table with your quantity and average cost.
+3. Review total value, unrealized P&L, allocation, opportunity scores, and recommendations.
 
-```bash
-python trader_assistant.py
-```
+## Data source and limitations
 
-## Fonctionnalités v1
-
-- Prix actuel.
-- Variation 24h.
-- RSI 14 jours.
-- Moyenne mobile 20 jours.
-- Volatilité 20 jours.
-- Score opportunité sur 10.
-- Décision claire : renforcer léger, surveiller, attendre, ne rien faire.
-- Allocation prudente sur ton budget USDT.
-
-## Prochaines versions possibles
-
-- Lecture portefeuille Binance en lecture seule.
-- Alertes Telegram.
-- Journal de trading.
-- Export Excel.
-- Déploiement web privé.
+Trader AI uses only public CoinGecko endpoints. Public endpoints can be rate limited or temporarily unavailable. The recommendation engine is educational and should not be treated as financial advice.

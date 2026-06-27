@@ -253,8 +253,8 @@ last_portfolio_sync = st.session_state.last_portfolio_sync
 binance_configured = portfolio_service.binance_configured
 
 
-SCREEN_RENDERERS = {
-    "Accueil": lambda: render_home(
+if screen == "Accueil":
+    render_home(
         best_row=best_row,
         worst_row=worst_row,
         portfolio=portfolio,
@@ -273,14 +273,16 @@ SCREEN_RENDERERS = {
         binance_configured=binance_configured,
         connection_status=connection_status,
         connection_message=connection_message,
-    ),
-    "Marchés": lambda: render_markets(
+    )
+elif screen == "Marchés":
+    render_markets(
         market_objects=market_objects,
         fng_display=fng_display,
         dominance=dominance,
         render_market_card=render_market_card,
-    ),
-    "Portefeuille": lambda: render_portfolio(
+    )
+elif screen == "Portefeuille":
+    render_portfolio(
         portfolio=portfolio,
         total_value=total_value,
         total_pnl=total_pnl,
@@ -293,22 +295,24 @@ SCREEN_RENDERERS = {
         connection_status=connection_status,
         connection_message=connection_message,
         last_sync=last_portfolio_sync,
-    ),
-    "Bots": render_bots,
-    "Actualités": lambda: render_news(
+    )
+elif screen == "Bots":
+    render_bots()
+elif screen == "Actualités":
+    render_news(
         news_service=news_service,
         one_sentence_summary=one_sentence_summary,
-    ),
-    "Calculateur": lambda: render_calculator(pct_class=pct_class),
-    "Opportunités": lambda: render_opportunities(
+    )
+elif screen == "Calculateur":
+    render_calculator(pct_class=pct_class)
+elif screen == "Opportunités":
+    render_opportunities(
         market_objects=market_objects,
         portfolio=portfolio,
         confidence_for=confidence_for,
         coin_logo=coin_logo,
         score_badge=score_badge,
         signal_label=signal_label,
-    ),
-    "Trader IA": lambda: render_trader_ai(market_objects=market_objects, portfolio=portfolio),
-}
-
-SCREEN_RENDERERS[screen]()
+    )
+elif screen == "Trader IA":
+    render_trader_ai(market_objects=market_objects, portfolio=portfolio)

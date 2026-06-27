@@ -50,8 +50,11 @@ class CoinGeckoClient:
             response = self.session.get(f"{BASE_URL}{path}", params=params, timeout=self.timeout)
             response.raise_for_status()
         except requests.RequestException as exc:
-            raise RuntimeError(f"CoinGecko request failed: {exc}") from exc
-        return response.json()
+            raise RuntimeError("CoinGecko est momentanément indisponible.") from exc
+        try:
+            return response.json()
+        except ValueError as exc:
+            raise RuntimeError("CoinGecko a renvoyé une réponse illisible.") from exc
 
     def fetch_markets(self, coin_ids: Iterable[str], currency: str = "usd") -> list[MarketCoin]:
         ids = [coin_id.strip().lower() for coin_id in coin_ids if coin_id.strip()]
@@ -72,7 +75,7 @@ class CoinGeckoClient:
             },
         )
         if not isinstance(data, list):
-            raise RuntimeError("CoinGecko returned an unexpected market payload.")
+            raise RuntimeError("CoinGecko a renvoyé des données de marché inattendues.")
         return [self._parse_market_coin(item) for item in data]
 
 

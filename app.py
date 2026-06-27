@@ -150,14 +150,19 @@ st.markdown(
 market_service = MarketService()
 portfolio_service = PortfolioService()
 news_service = NewsService()
-default_state = {"portfolio": portfolio_service.empty(), "last_portfolio_sync": None, "binance_connection_status": "not_configured", "binance_connection_message": "Connexion Binance non configurée", "watchlist": ["bitcoin", "ethereum", "solana"], "screen": "Accueil", "currency": "USD", "theme": "Premium Dark", "refresh_interval": "90 secondes"}
+default_state = {"portfolio": portfolio_service.empty(), "last_portfolio_sync": None, "binance_connection_status": "not_configured", "binance_connection_message": "Connexion Binance non configurée.", "watchlist": ["bitcoin", "ethereum", "solana"], "screen": "Accueil", "currency": "USD", "theme": "Premium Dark", "refresh_interval": "90 secondes"}
 for key, value in default_state.items():
     if key not in st.session_state:
         st.session_state[key] = value
 
 # Synchronisation automatique du portefeuille Binance en lecture seule.
 previous_connection_status = st.session_state.binance_connection_status
-sync_result = portfolio_service.sync_binance_portfolio()
+try:
+    sync_result = portfolio_service.sync_binance_portfolio()
+except AttributeError:
+    sync_result = portfolio_service.sync_portfolio()
+except Exception:
+    sync_result = portfolio_service._sync_error("not_configured", "Connexion Binance non configurée.")
 st.session_state.binance_connection_status = sync_result.connection_status
 st.session_state.binance_connection_message = sync_result.message
 if sync_result.synced_at:

@@ -124,7 +124,7 @@ def parse_binance_spot_csv(uploaded_file) -> pd.DataFrame:
         rows = [_row_from_symbol(sym, data["quantity"], data["cost"] / data["quantity"] if data["quantity"] else 0.0) for sym, data in positions.items() if data["quantity"] > 0]
         return normalize_portfolio(pd.DataFrame(rows))
 
-    raise ValueError("Unsupported Binance CSV. Upload a Spot balance CSV with Coin/Free/Locked columns or a trade CSV with Base Asset/Side/Quantity/Price columns.")
+    raise ValueError("CSV non pris en charge. Importe un fichier Spot avec les colonnes Coin/Free/Locked ou un historique avec Base Asset/Side/Quantity/Price.")
 
 
 def _row_from_symbol(symbol: str, quantity: float, avg_cost: float) -> dict[str, object]:
@@ -136,5 +136,5 @@ def _row_from_symbol(symbol: str, quantity: float, avg_cost: float) -> dict[str,
         "alert_below": 0.0,
         "alert_above": 0.0,
         "favorite": False,
-        "notes": "Imported from Binance CSV",
+        "notes": "Importé depuis un CSV",
     }

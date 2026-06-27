@@ -42,60 +42,60 @@ def opportunity_score(coin: MarketCoin) -> tuple[int, list[str]]:
 
     if -8 <= coin.price_change_24h_pct <= 3:
         score += 12
-        reasons.append("24h move is controlled")
+        reasons.append("mouvement 24 h maîtrisé")
     elif coin.price_change_24h_pct > 12:
         score -= 15
-        reasons.append("24h move looks overheated")
+        reasons.append("mouvement 24 h en surchauffe")
     elif coin.price_change_24h_pct < -15:
         score -= 10
-        reasons.append("sharp 24h drawdown adds risk")
+        reasons.append("fort recul 24 h, risque accru")
 
     if coin.price_change_7d_pct > 0:
         score += 10
-        reasons.append("7d trend is positive")
+        reasons.append("tendance 7 j positive")
     elif -12 <= coin.price_change_7d_pct <= 0:
         score += 5
-        reasons.append("7d pullback is still orderly")
+        reasons.append("repli 7 j encore ordonné")
     else:
         score -= 8
-        reasons.append("7d trend is weak")
+        reasons.append("tendance 7 j fragile")
 
     if coin.price_change_30d_pct > 0:
         score += 8
-        reasons.append("30d momentum confirms demand")
+        reasons.append("momentum 30 j favorable")
     elif coin.price_change_30d_pct < -25:
         score -= 8
-        reasons.append("30d trend is deeply negative")
+        reasons.append("tendance 30 j très négative")
 
     if coin.market_cap_rank and coin.market_cap_rank <= 50:
         score += 8
-        reasons.append("large-cap liquidity profile")
+        reasons.append("bonne liquidité de grande capitalisation")
     elif coin.market_cap_rank and coin.market_cap_rank <= 150:
         score += 4
-        reasons.append("mid-cap liquidity profile")
+        reasons.append("liquidité correcte de moyenne capitalisation")
 
     volume_to_market_cap = coin.total_volume / coin.market_cap if coin.market_cap else 0
     if volume_to_market_cap >= 0.08:
         score += 8
-        reasons.append("strong relative trading volume")
+        reasons.append("volume relatif élevé")
     elif 0 < volume_to_market_cap < 0.015:
         score -= 6
-        reasons.append("thin relative volume")
+        reasons.append("volume relatif faible")
 
     daily_range = ((coin.high_24h - coin.low_24h) / coin.current_price) * 100 if coin.current_price else 0
     if daily_range > 18:
         score -= 8
-        reasons.append("wide intraday range increases risk")
+        reasons.append("large plage intrajournalière, risque accru")
     elif 0 < daily_range <= 8:
         score += 4
-        reasons.append("intraday volatility is manageable")
+        reasons.append("volatilité intrajournalière maîtrisable")
 
     if coin.ath_change_pct < -70:
         score += 5
-        reasons.append("far below all-time high")
+        reasons.append("loin du plus haut historique")
     elif coin.ath_change_pct > -10:
         score -= 4
-        reasons.append("near all-time high")
+        reasons.append("proche du plus haut historique")
 
     return max(0, min(100, int(score))), reasons[:4]
 
@@ -103,14 +103,14 @@ def opportunity_score(coin: MarketCoin) -> tuple[int, list[str]]:
 def recommendation_for(coin: MarketCoin) -> Recommendation:
     score, reasons = opportunity_score(coin)
     if score >= 75:
-        action = "Consider accumulating gradually"
+        action = "Envisager une accumulation progressive"
     elif score >= 60:
-        action = "Watchlist / small position only"
+        action = "Liste de suivi / petite position seulement"
     elif score >= 45:
-        action = "Hold or wait for better setup"
+        action = "Conserver ou attendre une meilleure configuration"
     else:
-        action = "Avoid new exposure for now"
-    rationale = "; ".join(reasons) if reasons else "Neutral market structure from available CoinGecko data"
+        action = "Éviter une nouvelle exposition pour l’instant"
+    rationale = "; ".join(reasons) if reasons else "Structure de marché neutre selon les données CoinGecko disponibles"
     return Recommendation(coin.coin_id, coin.symbol, coin.name, score, action, rationale)
 
 
@@ -186,7 +186,7 @@ def triggered_alerts(portfolio: pd.DataFrame, markets: list[MarketCoin]) -> pd.D
         below = float(holding.get("alert_below") or 0)
         above = float(holding.get("alert_above") or 0)
         if below > 0 and coin.current_price <= below:
-            alerts.append({"Asset": coin.symbol, "Price": coin.current_price, "Alert": f"At or below ${below:,.2f}"})
+            alerts.append({"Asset": coin.symbol, "Price": coin.current_price, "Alert": f"au niveau ou sous ${below:,.2f}"})
         if above > 0 and coin.current_price >= above:
-            alerts.append({"Asset": coin.symbol, "Price": coin.current_price, "Alert": f"At or above ${above:,.2f}"})
+            alerts.append({"Asset": coin.symbol, "Price": coin.current_price, "Alert": f"au niveau ou au-dessus de ${above:,.2f}"})
     return pd.DataFrame(alerts)

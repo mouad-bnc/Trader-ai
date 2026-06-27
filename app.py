@@ -58,29 +58,29 @@ def coin_logo(coin: MarketCoin | None, symbol: str) -> str:
 
 
 def score_badge(score: int) -> str:
-    label = "Prime" if score >= 75 else "Strong" if score >= 60 else "Neutral" if score >= 45 else "Risk"
+    label = "Excellent" if score >= 75 else "Fort" if score >= 60 else "Neutre" if score >= 45 else "Risque"
     return f"<span class='score-badge'><b>{score}</b><small>{label}</small></span>"
 
 
 def risk_label(coin: MarketCoin) -> tuple[str, str]:
     daily_range = ((coin.high_24h - coin.low_24h) / coin.current_price) * 100 if coin.current_price else 0
     if daily_range > 18 or coin.price_change_24h_pct < -12:
-        return "High", "risk-high"
+        return "Élevé", "risk-high"
     if daily_range > 8 or coin.price_change_7d_pct < -8:
-        return "Medium", "risk-med"
-    return "Low", "risk-low"
+        return "Moyen", "risk-med"
+    return "Faible", "risk-low"
 
 
 def ai_badge(score: int) -> str:
     if score >= 78:
-        return "Strong Buy"
+        return "Achat fort"
     if score >= 62:
-        return "Buy"
+        return "Achat"
     if score >= 45:
-        return "Hold"
+        return "Conserver"
     if score >= 32:
-        return "Reduce"
-    return "Avoid"
+        return "Réduire"
+    return "Éviter"
 
 
 def confidence_for(coin: MarketCoin) -> int:
@@ -94,7 +94,7 @@ def volatility_pct(coin: MarketCoin) -> float:
 
 
 def one_sentence_summary(article: dict[str, object]) -> str:
-    text = str(article.get("description") or article.get("summary") or article.get("title") or "Latest crypto market update.")
+    text = str(article.get("description") or article.get("summary") or article.get("title") or "Dernière actualité du marché crypto.")
     first = text.replace("\n", " ").split(". ")[0].strip()
     return (first[:137] + "…") if len(first) > 140 else first
 
@@ -115,13 +115,13 @@ def render_market_card(coin: MarketCoin, owned_value: float = 0, favorite: bool 
         f"""
         <article class="coin-card float-in">
           <div class="coin-row">
-            <div class="coin-title">{coin_logo(coin, coin.symbol)}<div><h3>{html.escape(coin.name)}</h3><p>{html.escape(coin.symbol)} · Rank {rank}</p></div></div>
+            <div class="coin-title">{coin_logo(coin, coin.symbol)}<div><h3>{html.escape(coin.name)}</h3><p>{html.escape(coin.symbol)} · Rang {rank}</p></div></div>
             <div class="price-stack"><button class="fav" aria-label="favorite">{heart}</button><strong>{format_money(coin.current_price)}</strong><span class="{pct_class(coin.price_change_24h_pct)}">{trend_arrow} 24h {format_pct(coin.price_change_24h_pct)}</span></div>
           </div>
           {sparkline_svg(coin.sparkline, GREEN if coin.price_change_7d_pct >= 0 else RED)}
-          <div class="metric-grid"><span>AI <b>{ai_badge(rec.opportunity_score)}</b></span><span>Risk <b class="{risk_class}">{risk}</b></span><span>Confidence <b>{confidence}%</b></span></div>
+          <div class="metric-grid"><span>IA <b>{ai_badge(rec.opportunity_score)}</b></span><span>Risque <b class="{risk_class}">{risk}</b></span><span>Confiance <b>{confidence}%</b></span></div>
           <div class="volatility"><i style="width:{safe_width(vol * 4)}%"></i></div>
-          <div class="badge-row"><em>{trend_arrow} Trend</em><em>Volatility {vol:.1f}%</em>{f'<em>Holding {format_money(owned_value)}</em>' if owned_value else ''}</div>
+          <div class="badge-row"><em>{trend_arrow} Tendance</em><em>Volatilité {vol:.1f}%</em>{f'<em>Position {format_money(owned_value)}</em>' if owned_value else ''}</div>
         </article>
         """,
         unsafe_allow_html=True,
@@ -134,7 +134,7 @@ def render_holding_card(row: pd.Series, coin: MarketCoin | None) -> None:
     st.markdown(f"""<article class='coin-card holding-card'>
       <div class='coin-row'><div class='coin-title'>{coin_logo(coin, str(row['symbol']))}<div><h3>{html.escape(str(row['name']))}</h3><p>{float(row['quantity']):,.8f} {html.escape(str(row['symbol']))}</p></div></div><div class='price-stack'><strong>{format_money(float(row['value']))}</strong><span class='{pct_class(pnl)}'>{format_money(pnl)} · {format_pct(float(row['pnl_pct'])) if not pd.isna(row['pnl_pct']) else '—'}</span></div></div>
       {sparkline_svg(coin.sparkline if coin else [], GREEN if daily >= 0 else RED)}
-      <div class='metric-grid'><span>Avg price <b>{format_money(float(row['avg_cost']))}</b></span><span>Daily <b class='{pct_class(daily)}'>{format_pct(daily)}</b></span><span>Allocation <b>{format_pct(float(row['allocation_pct']))}</b></span></div>
+      <div class='metric-grid'><span>Prix moyen <b>{format_money(float(row['avg_cost']))}</b></span><span>Journalier <b class='{pct_class(daily)}'>{format_pct(daily)}</b></span><span>Allocation <b>{format_pct(float(row['allocation_pct']))}</b></span></div>
     </article>""", unsafe_allow_html=True)
 
 
@@ -150,35 +150,35 @@ st.markdown(
 )
 
 client = CoinGeckoClient()
-default_state = {"portfolio": empty_portfolio(), "watchlist": ["bitcoin", "ethereum", "solana"], "screen": "⌂", "currency": "USD", "theme": "Premium Dark", "refresh_interval": "90 seconds"}
+default_state = {"portfolio": empty_portfolio(), "watchlist": ["bitcoin", "ethereum", "solana"], "screen": "⌂", "currency": "USD", "theme": "Premium Dark", "refresh_interval": "90 secondes"}
 for key, value in default_state.items():
     if key not in st.session_state:
         st.session_state[key] = value
 
 with st.sidebar:
-    st.header("Data studio")
-    uploaded = st.file_uploader("Import exchange Spot CSV", type=["csv"], help="Educational import only. No API keys or execution.")
+    st.header("Studio de données")
+    uploaded = st.file_uploader("Importer un CSV Spot", type=["csv"], help="Import éducatif uniquement. Aucune clé API ni exécution.")
     if uploaded is not None:
         try:
             imported = parse_binance_spot_csv(uploaded)
-            if st.button("Use imported portfolio", type="primary", use_container_width=True):
+            if st.button("Utiliser le portefeuille importé", type="primary", use_container_width=True):
                 st.session_state.portfolio = imported
-                st.success(f"Imported {len(imported)} assets.")
+                st.success(f"Importé {len(imported)} actifs.")
         except Exception as exc:
-            st.error(str(exc))
+            st.warning(f"Import impossible : {html.escape(str(exc))}")
     st.divider()
     base_ids = set(st.session_state.portfolio.get("coin_id", pd.Series(dtype=str)).dropna().astype(str))
     default_ids = ", ".join(dict.fromkeys([*DEFAULT_COINS, *st.session_state.watchlist, *base_ids]))
-    coin_ids_text = st.text_area("CoinGecko IDs", value=default_ids, height=120)
-    include_trending = st.toggle("Include trending", value=True)
-    refresh = st.button("Refresh market data", use_container_width=True)
+    coin_ids_text = st.text_area("IDs CoinGecko", value=default_ids, height=120)
+    include_trending = st.toggle("Inclure les tendances", value=True)
+    refresh = st.button("Actualiser les données de marché", use_container_width=True)
 
 coin_ids = [coin.strip().lower() for coin in coin_ids_text.replace("\n", ",").split(",") if coin.strip()]
 if include_trending:
     try:
         coin_ids.extend(client.trending_ids())
-    except RuntimeError as exc:
-        st.sidebar.warning(str(exc))
+    except Exception:
+        st.sidebar.warning("Les tendances CoinGecko sont momentanément indisponibles.")
 coin_ids = list(dict.fromkeys(coin_ids))
 
 @st.cache_data(ttl=90, show_spinner=False)
@@ -189,10 +189,11 @@ try:
     if refresh:
         load_markets.clear()
     market_df = load_markets(tuple(coin_ids), st.session_state.currency)
-except RuntimeError as exc:
-    st.error(str(exc)); st.stop()
+except Exception:
+    st.warning("Les données CoinGecko sont momentanément indisponibles. Réessaie dans quelques instants.")
+    st.stop()
 if market_df.empty:
-    st.warning("Add valid CoinGecko IDs to begin."); st.stop()
+    st.warning("Ajoute des IDs CoinGecko valides pour commencer."); st.stop()
 
 market_objects = [MarketCoin(**row.to_dict()) for _, row in market_df.iterrows()]
 market_lookup = {coin.coin_id: coin for coin in market_objects}
@@ -210,97 +211,115 @@ fav_ids = set(st.session_state.portfolio.loc[st.session_state.portfolio["favorit
 best_row = portfolio.sort_values("pnl_pct", ascending=False).head(1) if not portfolio.empty else pd.DataFrame()
 worst_row = portfolio.sort_values("pnl_pct", ascending=True).head(1) if not portfolio.empty else pd.DataFrame()
 
-st.markdown("<div class='topbar'><div class='hello'><p>Good Morning Mouad 👋</p><h1>Trader AI</h1></div><div class='top-actions'><span class='icon-btn'>↻</span><span class='icon-btn'>🔔</span></div></div>", unsafe_allow_html=True)
+st.markdown("<div class='topbar'><div class='hello'><p>Bonjour Mouad 👋</p><h1>Trader AI</h1></div><div class='top-actions'><span class='icon-btn'>↻</span><span class='icon-btn'>🔔</span></div></div>", unsafe_allow_html=True)
 screen = st.radio("Navigation", ["⌂", "◌", "◎", "▣", "✦", "♡", "⚙"], horizontal=True, label_visibility="collapsed", key="screen")
 
 if screen == "⌂":
+    portfolio_placeholder = total_value <= 0
+    portfolio_value_html = "Ajoute tes positions pour calculer ton portefeuille." if portfolio_placeholder else format_money(total_value)
+    stats_html = (
+        "<div class='mini-stat'><span>Portefeuille</span><b>En attente</b></div>"
+        "<div class='mini-stat'><span>Performance</span><b>Ajoute tes positions</b></div>"
+        "<div class='mini-stat'><span>Actualisation</span><b>90s</b></div>"
+        if portfolio_placeholder
+        else f"<div class='mini-stat'><span>P&L du jour</span><b class='{pct_class(daily_pnl)}'>{format_money(daily_pnl)}<br>{format_pct(daily_pnl_pct)}</b></div><div class='mini-stat'><span>Performance 24 h</span><b class='{pct_class(daily_pnl_pct)}'>{format_pct(daily_pnl_pct)}</b></div><div class='mini-stat'><span>Actualisation</span><b>90s</b></div>"
+    )
+    allocation_html = (
+        "<p class='muted'>Ajoute tes positions pour calculer ton portefeuille.</p>"
+        if portfolio_placeholder
+        else "".join([f"<div class='allocation-pill'><b>{html.escape(str(r['symbol']))}</b><div class='allocation-bar'><i style='width:{safe_width(float(r['allocation_pct']))}%'></i></div><span>{format_pct(float(r['allocation_pct']))}</span></div>" for _, r in portfolio.head(6).iterrows()])
+    )
     st.markdown(f"""
-    <section class='portfolio-card float-in'><span class='eyebrow'>PORTFOLIO BALANCE</span><div class='value'>{format_money(total_value)}</div><div class='quick-grid'><div class='mini-stat'><span>Today's P&L</span><b class='{pct_class(daily_pnl)}'>{format_money(daily_pnl)}<br>{format_pct(daily_pnl_pct)}</b></div><div class='mini-stat'><span>24h Performance</span><b class='{pct_class(daily_pnl_pct)}'>{format_pct(daily_pnl_pct)}</b></div><div class='mini-stat'><span>Quick Refresh</span><b>90s</b></div></div>{sparkline_svg([sum((market_lookup.get(str(r['coin_id'])).sparkline[i] if market_lookup.get(str(r['coin_id'])) and len(market_lookup[str(r['coin_id'])].sparkline)>i else 0)*float(r['quantity']) for _, r in portfolio.iterrows()) for i in range(0, 42)] if not portfolio.empty else [])}<div class='metric-line'><span class='muted'>Notifications</span><b>{len(alerts)} active</b></div></section>
+    <section class='portfolio-card float-in'><span class='eyebrow'>SOLDE DU PORTEFEUILLE</span><div class='value'>{portfolio_value_html}</div><div class='quick-grid'>{stats_html}</div>{sparkline_svg([sum((market_lookup.get(str(r['coin_id'])).sparkline[i] if market_lookup.get(str(r['coin_id'])) and len(market_lookup[str(r['coin_id'])].sparkline)>i else 0)*float(r['quantity']) for _, r in portfolio.iterrows()) for i in range(0, 42)] if not portfolio_placeholder else [])}<div class='metric-line'><span class='muted'>Notifications</span><b>{len(alerts)} actives</b></div></section>
     """, unsafe_allow_html=True)
-    st.markdown("<section class='glass-card'><div class='section-head'><h2>Portfolio Allocation</h2><span class='muted'>Live mix</span></div><div class='allocation-list'>" + "".join([f"<div class='allocation-pill'><b>{html.escape(str(r['symbol']))}</b><div class='allocation-bar'><i style='width:{safe_width(float(r['allocation_pct']))}%'></i></div><span>{format_pct(float(r['allocation_pct']))}</span></div>" for _, r in portfolio.head(6).iterrows()]) + "</div></section>", unsafe_allow_html=True)
-    if st.button("Quick Refresh", use_container_width=True):
+    st.markdown("<section class='glass-card'><div class='section-head'><h2>Allocation du portefeuille</h2><span class='muted'>Répartition en direct</span></div><div class='allocation-list'>" + allocation_html + "</div></section>", unsafe_allow_html=True)
+    if st.button("Actualisation", use_container_width=True):
         load_markets.clear(); st.rerun()
     for _, alert in alerts.iterrows():
-        st.markdown(f"<div class='glass-card'>🔔 <b>{html.escape(str(alert['Asset']))}</b> {html.escape(str(alert['Alert']))} at {format_money(float(alert['Price']))}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='glass-card'>🔔 <b>{html.escape(str(alert['Asset']))}</b> {html.escape(str(alert['Alert']))} à {format_money(float(alert['Price']))}</div>", unsafe_allow_html=True)
 
 elif screen == "◌":
-    st.markdown("<div class='section-head'><h2>Portfolio</h2><span class='muted'>Holdings</span></div>", unsafe_allow_html=True)
-    with st.expander("Add or update holding", expanded=portfolio.empty):
+    st.markdown("<div class='section-head'><h2>Portefeuille</h2><span class='muted'>Positions</span></div>", unsafe_allow_html=True)
+    with st.expander("Ajouter ou modifier une position", expanded=portfolio.empty):
         with st.form("holding_form", clear_on_submit=False):
-            coin_id = st.selectbox("Asset", options=market_ids, format_func=lambda cid: f"{market_lookup[cid].name} ({market_lookup[cid].symbol})")
-            quantity = st.number_input("Quantity", min_value=0.0, step=0.0001, format="%.8f")
-            avg_cost = st.number_input("Average price", min_value=0.0, step=1.0, format="%.4f")
+            coin_id = st.selectbox("Actif", options=market_ids, format_func=lambda cid: f"{market_lookup[cid].name} ({market_lookup[cid].symbol})")
+            quantity = st.number_input("Quantité", min_value=0.0, step=0.0001, format="%.8f")
+            avg_cost = st.number_input("Prix moyen", min_value=0.0, step=1.0, format="%.4f")
             c1, c2 = st.columns(2)
-            alert_below = c1.number_input("Alert below", min_value=0.0, step=1.0, format="%.4f")
-            alert_above = c2.number_input("Alert above", min_value=0.0, step=1.0, format="%.4f")
-            favorite = st.toggle("Favorite", value=True)
-            notes = st.text_input("Notes", placeholder="Strategy, thesis, or reminder")
-            if st.form_submit_button("Save holding", use_container_width=True):
+            alert_below = c1.number_input("Alerte sous", min_value=0.0, step=1.0, format="%.4f")
+            alert_above = c2.number_input("Alerte au-dessus", min_value=0.0, step=1.0, format="%.4f")
+            favorite = st.toggle("Favori", value=True)
+            notes = st.text_input("Notes", placeholder="Stratégie, thèse ou rappel")
+            if st.form_submit_button("Enregistrer la position", use_container_width=True):
                 coin = market_lookup[coin_id]
                 next_row = pd.DataFrame([{"coin_id": coin_id, "symbol": coin.symbol, "quantity": quantity, "avg_cost": avg_cost, "alert_below": alert_below, "alert_above": alert_above, "favorite": favorite, "notes": notes}])
                 st.session_state.portfolio = normalize_portfolio(pd.concat([st.session_state.portfolio[st.session_state.portfolio["coin_id"] != coin_id], next_row], ignore_index=True)); st.rerun()
     for _, row in portfolio.iterrows():
         render_holding_card(row, market_lookup.get(str(row['coin_id'])))
-    st.download_button("Export portfolio CSV", st.session_state.portfolio.to_csv(index=False), "trader_ai_portfolio.csv", "text/csv", use_container_width=True)
+    st.download_button("Exporter le portefeuille CSV", st.session_state.portfolio.to_csv(index=False), "trader_ai_portfolio.csv", "text/csv", use_container_width=True)
 
 elif screen == "◎":
-    st.markdown("<div class='section-head'><h2>Markets</h2><span class='muted'>AI-ranked cards</span></div>", unsafe_allow_html=True)
-    selected_detail = st.selectbox("Open detail page", options=market_ids, format_func=lambda cid: f"{market_lookup[cid].name} ({market_lookup[cid].symbol})")
+    st.markdown("<div class='section-head'><h2>Marchés</h2><span class='muted'>Cartes classées par IA</span></div>", unsafe_allow_html=True)
+    selected_detail = st.selectbox("Ouvrir le détail", options=market_ids, format_func=lambda cid: f"{market_lookup[cid].name} ({market_lookup[cid].symbol})")
     coin = market_lookup[selected_detail]
     rec = recommendation_for(coin)
     support = min([coin.low_24h, *(coin.sparkline[-24:] or [coin.current_price])])
     resistance = max([coin.high_24h, *(coin.sparkline[-24:] or [coin.current_price])])
-    st.markdown(f"<section class='glass-card'><div class='coin-row'><div class='coin-title'>{coin_logo(coin, coin.symbol)}<div><h2>{html.escape(coin.name)} Detail</h2><p>TradingView-style market view</p></div></div>{score_badge(rec.opportunity_score)}</div><div class='chart-large'>{sparkline_svg(coin.sparkline, GREEN if coin.price_change_7d_pct >= 0 else RED)}</div><div class='metric-grid'><span>Support <b>{format_money(support)}</b></span><span>Resistance <b>{format_money(resistance)}</b></span><span>Volatility <b>{volatility_pct(coin):.1f}%</b></span></div><p class='muted'><b>AI analysis:</b> {html.escape(rec.rationale)}. Opportunity: {html.escape(ai_badge(rec.opportunity_score))} because momentum, liquidity, and risk are balanced using CoinGecko market data.</p><div class='metric-grid'><span>Momentum <b class='{pct_class(coin.price_change_7d_pct)}'>{format_pct(coin.price_change_7d_pct)}</b></span><span>30D history <b class='{pct_class(coin.price_change_30d_pct)}'>{format_pct(coin.price_change_30d_pct)}</b></span><span>Mkt cap <b>{format_money(coin.market_cap)}</b></span></div></section>", unsafe_allow_html=True)
-    sort_by = st.selectbox("Sort markets", ["Market rank", "AI score", "24h gain", "7d gain", "Volume"])
+    st.markdown(f"<section class='glass-card'><div class='coin-row'><div class='coin-title'>{coin_logo(coin, coin.symbol)}<div><h2>{html.escape(coin.name)} — détail</h2><p>Vue de marché premium éducative</p></div></div>{score_badge(rec.opportunity_score)}</div><div class='chart-large'>{sparkline_svg(coin.sparkline, GREEN if coin.price_change_7d_pct >= 0 else RED)}</div><div class='metric-grid'><span>Support <b>{format_money(support)}</b></span><span>Résistance <b>{format_money(resistance)}</b></span><span>Volatilité <b>{volatility_pct(coin):.1f}%</b></span></div><p class='muted'><b>Analyse IA :</b> {html.escape(rec.rationale)}. Opportunité : {html.escape(ai_badge(rec.opportunity_score))}. Données CoinGecko uniquement, sans exécution d’ordre.</p><div class='metric-grid'><span>Momentum <b class='{pct_class(coin.price_change_7d_pct)}'>{format_pct(coin.price_change_7d_pct)}</b></span><span>Historique 30 j <b class='{pct_class(coin.price_change_30d_pct)}'>{format_pct(coin.price_change_30d_pct)}</b></span><span>Cap. marché <b>{format_money(coin.market_cap)}</b></span></div></section>", unsafe_allow_html=True)
+    sort_by = st.selectbox("Trier les marchés", ["Rang de marché", "Score IA", "Gain 24 h", "Gain 7 j", "Volume"])
     coins = market_objects[:]
-    if sort_by == "AI score": coins.sort(key=lambda c: recommendation_for(c).opportunity_score, reverse=True)
-    elif sort_by == "24h gain": coins.sort(key=lambda c: c.price_change_24h_pct, reverse=True)
-    elif sort_by == "7d gain": coins.sort(key=lambda c: c.price_change_7d_pct, reverse=True)
+    if sort_by == "Score IA": coins.sort(key=lambda c: recommendation_for(c).opportunity_score, reverse=True)
+    elif sort_by == "Gain 24 h": coins.sort(key=lambda c: c.price_change_24h_pct, reverse=True)
+    elif sort_by == "Gain 7 j": coins.sort(key=lambda c: c.price_change_7d_pct, reverse=True)
     elif sort_by == "Volume": coins.sort(key=lambda c: c.total_volume, reverse=True)
     for coin in coins: render_market_card(coin, favorite=coin.coin_id in fav_ids or coin.coin_id in st.session_state.watchlist)
 
 elif screen == "▣":
-    st.markdown("<div class='section-head'><h2>News</h2><span class='muted'>CoinGecko latest</span></div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-head'><h2>Actualités</h2><span class='muted'>Dernières nouvelles CoinGecko</span></div>", unsafe_allow_html=True)
     @st.cache_data(ttl=300, show_spinner=False)
     def load_news() -> list[dict[str, object]]:
         return client.fetch_news(per_page=10)
-    try: articles = load_news()
-    except RuntimeError as exc:
-        st.warning(f"CoinGecko news is unavailable on this plan or network: {exc}"); articles = []
+    try:
+        articles = load_news()
+    except Exception:
+        st.warning("Les actualités CoinGecko sont momentanément indisponibles. Aucune actualité ne peut être affichée pour l’instant.")
+        articles = []
+    if not articles:
+        st.markdown("<section class='glass-card'><h3>Actualités indisponibles</h3><p class='muted'>CoinGecko ne renvoie pas d’actualités pour le moment. Le reste de l’application reste disponible avec les données de marché CoinGecko.</p></section>", unsafe_allow_html=True)
     for article in articles[:10]:
-        title = html.escape(str(article.get('title') or 'Crypto market update'))
+        title = html.escape(str(article.get('title') or 'Actualité du marché crypto'))
         source = html.escape(str(article.get('source') or article.get('source_name') or 'CoinGecko'))
         url = html.escape(str(article.get('url') or article.get('link') or '#'))
-        st.markdown(f"<article class='glass-card news-card'><span class='eyebrow'>{source}</span><h3>{title}</h3><p class='muted'>{html.escape(one_sentence_summary(article))}</p><a href='{url}' target='_blank'>Read article →</a></article>", unsafe_allow_html=True)
+        st.markdown(f"<article class='glass-card news-card'><span class='eyebrow'>{source}</span><h3>{title}</h3><p class='muted'>{html.escape(one_sentence_summary(article))}</p><a href='{url}' target='_blank'>Lire l’article →</a></article>", unsafe_allow_html=True)
 
 elif screen == "✦":
-    st.markdown("<div class='section-head'><h2>AI Assistant</h2><span class='muted'>Explain why</span></div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-head'><h2>Assistant IA</h2><span class='muted'>Analyse éducative</span></div>", unsafe_allow_html=True)
     best = max(market_objects, key=lambda c: recommendation_for(c).opportunity_score)
     riskiest = max(market_objects, key=volatility_pct)
-    st.markdown(f"<section class='ai-card assistant-grid'><div class='assistant-card'><b>Market Summary</b><p class='muted'>The tracked market is led by {html.escape(best.name)} with {format_pct(best.price_change_7d_pct)} 7D performance and mixed short-term volatility.</p></div><div class='assistant-card'><b>Best Opportunity Today</b><p class='muted'>{html.escape(best.name)} — {ai_badge(recommendation_for(best).opportunity_score)} because {html.escape(recommendation_for(best).rationale)}.</p></div><div class='assistant-card'><b>Highest Risk Today</b><p class='muted'>{html.escape(riskiest.name)} because its 24h range is {volatility_pct(riskiest):.1f}%.</p></div><div class='assistant-card'><b>Portfolio Advice</b><p class='muted'>Keep allocations diversified, size positions by risk, and treat this as educational research only—not financial advice.</p></div></section>", unsafe_allow_html=True)
+    st.markdown(f"<section class='ai-card assistant-grid'><div class='assistant-card'><b>Résumé du marché</b><p class='muted'>Parmi les actifs suivis, {html.escape(best.name)} présente le meilleur score IA avec une performance 7 j de {format_pct(best.price_change_7d_pct)}. La lecture reste éducative et basée uniquement sur CoinGecko.</p></div><div class='assistant-card'><b>Meilleure opportunité</b><p class='muted'>{html.escape(best.name)} — {ai_badge(recommendation_for(best).opportunity_score)}. Raisons principales : {html.escape(recommendation_for(best).rationale)}.</p></div><div class='assistant-card'><b>Risque principal</b><p class='muted'>{html.escape(riskiest.name)} affiche la plage 24 h la plus large ({volatility_pct(riskiest):.1f}%). Réduis la taille des positions quand la volatilité augmente.</p></div><div class='assistant-card'><b>Conseil du jour</b><p class='muted'>Diversifie tes allocations, définis ton risque avant chaque décision et considère cette application comme un support pédagogique, pas comme un conseil financier.</p></div></section>", unsafe_allow_html=True)
 
 elif screen == "♡":
-    st.markdown("<div class='section-head'><h2>Watchlist</h2><span class='muted'>Swipe-style cards</span></div>", unsafe_allow_html=True)
-    query = st.text_input("Search", placeholder="Search coin or ticker")
-    picks = st.multiselect("Favorite coins", options=market_ids, default=[x for x in st.session_state.watchlist if x in market_ids], format_func=lambda cid: f"{market_lookup[cid].name} ({market_lookup[cid].symbol})")
+    st.markdown("<div class='section-head'><h2>Liste de suivi</h2><span class='muted'>Cartes premium</span></div>", unsafe_allow_html=True)
+    query = st.text_input("Rechercher", placeholder="Rechercher une crypto ou un symbole")
+    picks = st.multiselect("Cryptos favorites", options=market_ids, default=[x for x in st.session_state.watchlist if x in market_ids], format_func=lambda cid: f"{market_lookup[cid].name} ({market_lookup[cid].symbol})")
     st.session_state.watchlist = picks
-    filter_mode = st.selectbox("Filter", ["All", "Gainers", "Decliners", "High AI score", "Low risk"])
-    sort_mode = st.selectbox("Sort", ["AI score", "Rank", "24h", "7d"])
+    filter_mode = st.selectbox("Filtrer", ["Toutes", "En hausse", "En baisse", "Score IA élevé", "Risque faible"])
+    sort_mode = st.selectbox("Trier", ["Score IA", "Rang", "24h", "7j"])
     watch_coins = [market_lookup[cid] for cid in dict.fromkeys([*picks, *fav_ids]) if cid in market_lookup and (not query or query.lower() in market_lookup[cid].name.lower() or query.lower() in market_lookup[cid].symbol.lower())]
-    if filter_mode == "Gainers": watch_coins = [c for c in watch_coins if c.price_change_24h_pct >= 0]
-    elif filter_mode == "Decliners": watch_coins = [c for c in watch_coins if c.price_change_24h_pct < 0]
-    elif filter_mode == "High AI score": watch_coins = [c for c in watch_coins if recommendation_for(c).opportunity_score >= 60]
-    elif filter_mode == "Low risk": watch_coins = [c for c in watch_coins if risk_label(c)[0] == "Low"]
-    if sort_mode == "AI score": watch_coins.sort(key=lambda c: recommendation_for(c).opportunity_score, reverse=True)
-    elif sort_mode == "Rank": watch_coins.sort(key=lambda c: c.market_cap_rank or 9999)
+    if filter_mode == "En hausse": watch_coins = [c for c in watch_coins if c.price_change_24h_pct >= 0]
+    elif filter_mode == "En baisse": watch_coins = [c for c in watch_coins if c.price_change_24h_pct < 0]
+    elif filter_mode == "Score IA élevé": watch_coins = [c for c in watch_coins if recommendation_for(c).opportunity_score >= 60]
+    elif filter_mode == "Risque faible": watch_coins = [c for c in watch_coins if risk_label(c)[0] == "Faible"]
+    if sort_mode == "Score IA": watch_coins.sort(key=lambda c: recommendation_for(c).opportunity_score, reverse=True)
+    elif sort_mode == "Rang": watch_coins.sort(key=lambda c: c.market_cap_rank or 9999)
     elif sort_mode == "24h": watch_coins.sort(key=lambda c: c.price_change_24h_pct, reverse=True)
     else: watch_coins.sort(key=lambda c: c.price_change_7d_pct, reverse=True)
     for coin in watch_coins: render_market_card(coin, favorite=True)
 
 else:
-    st.markdown("<section class='glass-card'><h2 class='settings-title'>Settings</h2><p class='muted'>Premium dark theme, CoinGecko-only data, no Binance API, no trading, educational only.</p></section>", unsafe_allow_html=True)
-    st.session_state.theme = st.selectbox("Theme", ["Premium Dark"], index=0)
-    st.session_state.currency = st.selectbox("Currency", ["USD", "EUR", "GBP"], index=["USD", "EUR", "GBP"].index(st.session_state.currency))
+    st.markdown("<section class='glass-card'><h2 class='settings-title'>Réglages</h2><p class='muted'>Thème premium sombre, données CoinGecko uniquement, aucune API Binance, aucune exécution d’ordre, usage éducatif uniquement.</p></section>", unsafe_allow_html=True)
+    st.session_state.theme = st.selectbox("Thème", ["Premium Dark"], index=0)
+    st.session_state.currency = st.selectbox("Devise", ["USD", "EUR", "GBP"], index=["USD", "EUR", "GBP"].index(st.session_state.currency))
     notifications = st.toggle("Notifications", value=True)
-    st.session_state.refresh_interval = st.selectbox("Refresh interval", ["60 seconds", "90 seconds", "5 minutes"], index=["60 seconds", "90 seconds", "5 minutes"].index(st.session_state.refresh_interval))
-    st.markdown(f"<section class='glass-card'><div class='setting-row'><span>About</span><b>{APP_NAME} v{APP_VERSION}</b></div><div class='setting-row'><span>Notifications</span><b>{'On' if notifications else 'Off'}</b></div><div class='setting-row'><span>Data source</span><b>CoinGecko only</b></div><p class='muted'><b>Educational disclaimer:</b> Trader AI is for market education and research. It does not provide financial advice, execute trades, connect to Binance, or custody assets.</p></section>", unsafe_allow_html=True)
+    st.session_state.refresh_interval = st.selectbox("Intervalle d’actualisation", ["60 secondes", "90 secondes", "5 minutes"], index=["60 secondes", "90 secondes", "5 minutes"].index(st.session_state.refresh_interval))
+    st.markdown(f"<section class='glass-card'><div class='setting-row'><span>À propos</span><b>{APP_NAME} v{APP_VERSION}</b></div><div class='setting-row'><span>Notifications</span><b>{'Activées' if notifications else 'Désactivées'}</b></div><div class='setting-row'><span>Source des données</span><b>CoinGecko uniquement</b></div><p class='muted'><b>Avertissement éducatif :</b> Trader AI sert uniquement à l’éducation et à la recherche de marché. L’application ne fournit pas de conseil financier, n’exécute aucun ordre, ne se connecte pas à Binance et ne conserve aucun actif.</p></section>", unsafe_allow_html=True)

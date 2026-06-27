@@ -7,11 +7,17 @@ from typing import Iterable
 import pandas as pd
 import streamlit as st
 
-from binance import BinanceReadOnlyClient
 from coingecko import DEFAULT_COINS, CoinGeckoClient, MarketCoin, markets_to_frame
 from portfolio_analytics import enrich_portfolio, format_money, format_pct, recommendation_for, triggered_alerts
 from portfolio_io import empty_portfolio, normalize_portfolio, parse_binance_spot_csv
+from pages.bots import render_bots
+from pages.calculator import render_calculator
 from pages.home import render_home
+from pages.markets import render_markets
+from pages.news import render_news
+from pages.opportunities import render_opportunities
+from pages.portfolio import render_portfolio
+from pages.trader_ai import render_trader_ai
 
 APP_NAME = "Mouad Saissi - Trader"
 APP_VERSION = "5.0"
@@ -259,110 +265,6 @@ dominance = btc_dominance(market_objects)
 segments = segment_allocation(total_value)
 fng_display = f"{fng_value}/100" if fng_value is not None else "Indisponible"
 
-def render_markets() -> None:
-    st.markdown(f"<section class='glass-card'><div class='section-head'><h2>Marchés</h2><span class='muted'>Fear & Greed {fng_display} · BTC {dominance:.1f}%</span></div></section>", unsafe_allow_html=True)
-    query = st.text_input("Recherche crypto", placeholder="BTC, ETH, SOL…")
-    filtered = [c for c in market_objects if not query or query.lower() in c.name.lower() or query.upper() in c.symbol]
-    st.markdown("<h3>Meilleures hausses</h3>", unsafe_allow_html=True)
-    for coin in sorted(filtered, key=lambda c: c.price_change_24h_pct, reverse=True)[:3]: render_market_card(coin, favorite=coin.coin_id in st.session_state.watchlist)
-    st.markdown("<h3>Plus fortes baisses</h3>", unsafe_allow_html=True)
-    for coin in sorted(filtered, key=lambda c: c.price_change_24h_pct)[:3]: render_market_card(coin, favorite=coin.coin_id in st.session_state.watchlist)
-    st.markdown("<h3>Liste de suivi</h3>", unsafe_allow_html=True)
-    for coin in [c for c in filtered if c.coin_id in st.session_state.watchlist][:5]: render_market_card(coin, favorite=True)
-
-
-
-def render_portfolio() -> None:
-    binance = BinanceReadOnlyClient()
-    if portfolio.empty:
-        st.markdown("<section class='empty-card'><div class='empty-icon'>◒</div><h2>Votre portefeuille est prêt.</h2><p class='muted'>Connectez Binance ou ajoutez une position pour afficher la valeur totale, l'allocation, le donut et la liste des actifs.</p></section>", unsafe_allow_html=True)
-    else:
-        st.markdown(f"<section class='portfolio-card'><span class='eyebrow'>PORTEFEUILLE</span><div class='value'>{format_money(total_value)}</div><div class='donut'></div><div class='quick-grid'><div class='mini-stat'><span>Spot</span><b>{format_money(total_value)}</b></div><div class='mini-stat'><span>Allocation</span><b>{len(portfolio)} actifs</b></div><div class='mini-stat'><span>PnL</span><b class='{pct_class(total_pnl)}'>{format_pct(total_pnl_pct)}</b></div></div></section>", unsafe_allow_html=True)
-    if not binance.configured:
-        st.markdown("<section class='empty-card'><div class='section-head'><h3>Binance</h3><span class='pill'>Hors ligne</span></div><p class='muted'>API absente. Activez une clé lecture seule pour synchroniser automatiquement vos soldes Spot.</p></section>", unsafe_allow_html=True)
-        st.button("Connecter Binance", use_container_width=True)
-    else:
-        try:
-            assets = binance.spot_assets()
-            st.markdown("<h3>Binance Spot lecture seule</h3>", unsafe_allow_html=True)
-            for asset in assets[:12]:
-                st.markdown(f"<div class='glass-card'><div class='metric-line'><b>{asset.symbol}</b><span>{asset.quantity:,.8f}</span></div><div class='metric-line'><span>Prix actuel</span><b>{format_money(asset.current_price)}</b></div><div class='metric-line'><span>Valeur</span><b>{format_money(asset.value)}</b></div></div>", unsafe_allow_html=True)
-        except Exception as exc:
-            st.warning(f"Lecture Binance indisponible : {html.escape(str(exc))}")
-    with st.expander("Ajouter ou modifier une position", expanded=portfolio.empty):
-        with st.form("holding_form", clear_on_submit=False):
-            coin_id = st.selectbox("Actif", options=market_ids, format_func=lambda cid: f"{market_lookup[cid].name} ({market_lookup[cid].symbol})")
-            quantity = st.number_input("Quantité", min_value=0.0, step=0.0001, format="%.8f")
-            avg_cost = st.number_input("Prix moyen", min_value=0.0, step=1.0, format="%.4f")
-            favorite = st.toggle("Favori", value=True)
-            if st.form_submit_button("Enregistrer la position", use_container_width=True):
-                coin = market_lookup[coin_id]
-                next_row = pd.DataFrame([{"coin_id": coin_id, "symbol": coin.symbol, "quantity": quantity, "avg_cost": avg_cost, "alert_below": 0, "alert_above": 0, "favorite": favorite, "notes": ""}])
-                st.session_state.portfolio = normalize_portfolio(pd.concat([st.session_state.portfolio[st.session_state.portfolio["coin_id"] != coin_id], next_row], ignore_index=True)); st.rerun()
-    for _, row in portfolio.iterrows(): render_holding_card(row, market_lookup.get(str(row['coin_id'])))
-
-
-
-def render_bots() -> None:
-    st.markdown("<section class='empty-card'><div class='empty-icon'>⌘</div><h2>Bots</h2><p class='muted'>Aucun bot connecté. Les performances réelles s'afficheront uniquement après connexion d'une source de données.</p></section>", unsafe_allow_html=True)
-
-
-
-def render_news() -> None:
-    @st.cache_data(ttl=300, show_spinner=False)
-    def load_news() -> list[dict[str, object]]: return client.fetch_news(per_page=10)
-    try: articles = load_news() or demo_news()
-    except Exception: articles = demo_news()
-    if not articles:
-        st.markdown("<section class='empty-card'><div class='empty-icon'>▧</div><h2>Feed indisponible</h2><p class='muted'>Aucune actualité vérifiée n'est disponible pour le moment. Réessayez après la prochaine synchronisation.</p></section>", unsafe_allow_html=True)
-    for article in articles[:10]:
-        tags = article.get('tags') or [tag for tag in ['BTC','ETH','SOL','DOGE','SUI'] if tag.lower() in str(article).lower()] or ['Crypto']
-        image = html.escape(str(article.get('thumb_2x') or article.get('image') or article.get('urlToImage') or ''))
-        image_style = f" style=\"background-image:url('{image}')\"" if image else ""
-        source = html.escape(str(article.get('source') or article.get('source_name') or 'Source crypto'))
-        st.markdown(f"<article class='news-card'><div class='news-img'{image_style}></div><span class='eyebrow'>{source}</span><h3>{html.escape(str(article.get('title') or 'Actualité crypto'))}</h3><p class='muted'>{html.escape(str(article.get('date') or article.get('created_at') or 'Maintenant'))}</p><p>{html.escape(one_sentence_summary(article))}</p><div class='badge-row'>{''.join(f'<em>{html.escape(str(t))}</em>' for t in tags)}</div></article>", unsafe_allow_html=True)
-
-
-
-def render_calculator() -> None:
-    st.markdown("<section class='glass-card'><h2>Calculateur</h2><p class='muted'>Résultat instantané.</p></section>", unsafe_allow_html=True)
-    c1, c2 = st.columns(2)
-    capital = c1.number_input("Capital", min_value=0.0, value=1000.0)
-    prix = c2.number_input("Prix actuel", min_value=0.000001, value=100.0, format="%.6f")
-    entree = c1.number_input("Prix d’entrée", min_value=0.000001, value=90.0, format="%.6f")
-    sortie = c2.number_input("Objectif gain", min_value=0.000001, value=120.0, format="%.6f")
-    stop = c1.number_input("Seuil de protection", min_value=0.000001, value=80.0, format="%.6f")
-    dca = c2.number_input("Achat DCA", min_value=0.0, value=250.0)
-    qty = capital / entree if entree else 0
-    avg = (capital + dca) / (qty + dca / prix) if prix and qty + dca / prix else entree
-    roi = (sortie - avg) / avg * 100
-    risk = max(avg - stop, 0); reward = max(sortie - avg, 0)
-    st.markdown(f"<section class='portfolio-card'><div class='metric-grid'><span>Prix moyen <b>{format_money(avg)}</b></span><span>DCA <b>{format_money(dca)}</b></span><span>ROI <b class='{pct_class(roi)}'>{format_pct(roi)}</b></span><span>Ratio risque/rendement <b>{(reward/risk if risk else 0):.2f}</b></span><span>Taille position <b>{qty:.6f}</b></span><span>Seuil de protection <b>{format_money(stop)}</b></span></div></section>", unsafe_allow_html=True)
-
-
-
-def render_opportunities() -> None:
-    st.markdown("<section class='glass-card'><h2>Opportunités</h2><p class='notice'>Analyse indicative uniquement.</p></section>", unsafe_allow_html=True)
-    for coin in sorted(market_objects, key=lambda c: recommendation_for(c).opportunity_score, reverse=True)[:12]:
-        rec = recommendation_for(coin); conf = confidence_for(coin)
-        st.markdown(f"<article class='coin-card'><div class='coin-row'><div class='coin-title'>{coin_logo(coin, coin.symbol)}<div><h3>{coin.name}</h3><p>{coin.symbol}</p></div></div>{score_badge(rec.opportunity_score)}</div><div class='metric-grid'><span>Signal <b>{signal_label(rec.opportunity_score)}</b></span><span>Confiance <b>{conf}%</b></span><span>Prix <b>{format_money(coin.current_price)}</b></span></div><p class='muted'>{html.escape(rec.rationale)}</p></article>", unsafe_allow_html=True)
-
-
-
-def render_trader_ai() -> None:
-    if "messages" not in st.session_state:
-        st.session_state.messages = [{"role": "bot", "text": "Bonjour Mouad 👋\n\nJe suis Trader.\n\nJe peux analyser :\n• ton portefeuille\n• le marché\n• une crypto\n• les news\n• les opportunités."}]
-    for msg in st.session_state.messages:
-        st.markdown(f"<div class='chat-bubble {'bot' if msg['role']=='bot' else 'user'}'>{html.escape(msg['text'])}</div>", unsafe_allow_html=True)
-    prompt = st.text_input("Message", placeholder="Demandez à Trader d’analyser votre portefeuille...")
-    for suggestion in ["Analyser mon portefeuille", "Faut-il acheter SOL ?", "DOGE est-il encore intéressant ?", "Meilleure opportunité aujourd’hui", "Calculer mon prix moyen"]:
-        if st.button(suggestion, use_container_width=True): prompt = suggestion
-    if prompt:
-        best = max(market_objects, key=lambda c: recommendation_for(c).opportunity_score)
-        st.session_state.messages.append({"role":"user","text":prompt})
-        st.session_state.messages.append({"role":"bot","text":f"Analyse indicative : {best.name} obtient le meilleur score actuel ({recommendation_for(best).opportunity_score}/100). Vérifie toujours ton risque, ton prix moyen et ton stop avant toute décision."})
-        st.rerun()
-
 
 SCREEN_RENDERERS = {
     "Accueil": lambda: render_home(
@@ -382,13 +284,37 @@ SCREEN_RENDERERS = {
         pct_class=pct_class,
         sparkline_svg=sparkline_svg,
     ),
-    "Marchés": render_markets,
-    "Portefeuille": render_portfolio,
+    "Marchés": lambda: render_markets(
+        market_objects=market_objects,
+        fng_display=fng_display,
+        dominance=dominance,
+        render_market_card=render_market_card,
+    ),
+    "Portefeuille": lambda: render_portfolio(
+        portfolio=portfolio,
+        total_value=total_value,
+        total_pnl=total_pnl,
+        total_pnl_pct=total_pnl_pct,
+        market_ids=market_ids,
+        market_lookup=market_lookup,
+        pct_class=pct_class,
+        render_holding_card=render_holding_card,
+    ),
     "Bots": render_bots,
-    "Actualités": render_news,
-    "Calculateur": render_calculator,
-    "Opportunités": render_opportunities,
-    "Trader IA": render_trader_ai,
+    "Actualités": lambda: render_news(
+        client=client,
+        demo_news=demo_news,
+        one_sentence_summary=one_sentence_summary,
+    ),
+    "Calculateur": lambda: render_calculator(pct_class=pct_class),
+    "Opportunités": lambda: render_opportunities(
+        market_objects=market_objects,
+        confidence_for=confidence_for,
+        coin_logo=coin_logo,
+        score_badge=score_badge,
+        signal_label=signal_label,
+    ),
+    "Trader IA": lambda: render_trader_ai(market_objects=market_objects),
 }
 
 SCREEN_RENDERERS[screen]()

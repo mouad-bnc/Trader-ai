@@ -3,6 +3,7 @@ from __future__ import annotations
 import streamlit as st
 
 from binance import BinanceReadOnlyClient
+from components.ui import render_empty_card
 from portfolio_analytics import format_money, format_pct
 
 
@@ -28,7 +29,7 @@ def render_home(
     top_gain = best_row.iloc[0] if not best_row.empty else None
     top_loss = worst_row.iloc[0] if not worst_row.empty else None
     if portfolio.empty and not BinanceReadOnlyClient().configured:
-        st.markdown("""<section class='empty-card'><div class='empty-icon'>⌁</div><h2>Connectez Binance pour afficher votre portefeuille.</h2><p class='muted'>Vos soldes, votre allocation et votre PnL apparaîtront ici dès qu'une connexion lecture seule sera disponible.</p></section>""", unsafe_allow_html=True)
+        render_empty_card("⌁", "Connectez Binance pour afficher votre portefeuille.", "Vos soldes, votre allocation et votre PnL apparaîtront ici dès qu'une connexion lecture seule sera disponible.")
         if st.button("Connecter Binance", use_container_width=True):
             st.toast("Ajoutez BINANCE_API_KEY et BINANCE_API_SECRET côté serveur pour activer la synchronisation.")
     else:

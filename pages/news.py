@@ -4,6 +4,8 @@ import html
 
 import streamlit as st
 
+from components.ui import render_empty_card
+
 
 def render_news(*, client, demo_news, one_sentence_summary) -> None:
     @st.cache_data(ttl=300, show_spinner=False)
@@ -11,7 +13,7 @@ def render_news(*, client, demo_news, one_sentence_summary) -> None:
     try: articles = load_news() or demo_news()
     except Exception: articles = demo_news()
     if not articles:
-        st.markdown("<section class='empty-card'><div class='empty-icon'>▧</div><h2>Feed indisponible</h2><p class='muted'>Aucune actualité vérifiée n'est disponible pour le moment. Réessayez après la prochaine synchronisation.</p></section>", unsafe_allow_html=True)
+        render_empty_card("▧", "Feed indisponible", "Aucune actualité vérifiée n'est disponible pour le moment. Réessayez après la prochaine synchronisation.")
     for article in articles[:10]:
         tags = article.get('tags') or [tag for tag in ['BTC','ETH','SOL','DOGE','SUI'] if tag.lower() in str(article).lower()] or ['Crypto']
         image = html.escape(str(article.get('thumb_2x') or article.get('image') or article.get('urlToImage') or ''))

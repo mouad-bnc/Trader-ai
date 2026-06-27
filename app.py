@@ -8,6 +8,8 @@ import pandas as pd
 import streamlit as st
 
 from coingecko import DEFAULT_COINS, CoinGeckoClient, MarketCoin, markets_to_frame
+from components.badges import score_badge
+from components.cards import coin_logo, render_holding_card as component_holding_card, render_market_card as component_market_card
 from portfolio_analytics import enrich_portfolio, format_money, format_pct, recommendation_for, triggered_alerts
 from portfolio_io import empty_portfolio, normalize_portfolio, parse_binance_spot_csv
 from pages.bots import render_bots
@@ -58,17 +60,6 @@ def sparkline_svg(values: Iterable[float], stroke: str = GOLD) -> str:
         f"<polyline points='{' '.join(coords)}' fill='none' stroke='{stroke}' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'></polyline>"
         "</svg>"
     )
-
-
-def coin_logo(coin: MarketCoin | None, symbol: str) -> str:
-    if coin and coin.image:
-        return f"<img class='coin-logo' src='{html.escape(coin.image)}' alt='{html.escape(symbol)} logo'>"
-    return f"<div class='coin-fallback'>{html.escape(symbol[:1] or '✦')}</div>"
-
-
-def score_badge(score: int) -> str:
-    label = "Excellent" if score >= 75 else "Fort" if score >= 60 else "Neutre" if score >= 45 else "Risque"
-    return f"<span class='score-badge'><b>{score}</b><small>{label}</small></span>"
 
 
 def risk_label(coin: MarketCoin) -> tuple[str, str]:
@@ -152,38 +143,23 @@ def render_progress(label: str, value: int, detail: str = "") -> None:
 
 
 def render_market_card(coin: MarketCoin, owned_value: float = 0, favorite: bool = False) -> None:
-    rec = recommendation_for(coin)
-    risk, risk_class = risk_label(coin)
-    rank = f"#{coin.market_cap_rank}" if coin.market_cap_rank else "—"
-    heart = "♥" if favorite else "♡"
-    trend_arrow = "↗" if coin.price_change_24h_pct >= 0 else "↘"
-    vol = volatility_pct(coin)
-    confidence = confidence_for(coin)
-    st.markdown(
-        f"""
-        <article class="coin-card float-in">
-          <div class="coin-row">
-            <div class="coin-title">{coin_logo(coin, coin.symbol)}<div><h3>{html.escape(coin.name)}</h3><p>{html.escape(coin.symbol)} · Rang {rank}</p></div></div>
-            <div class="price-stack"><button class="fav" aria-label="favori">{heart}</button><strong>{format_money(coin.current_price)}</strong><span class="{pct_class(coin.price_change_24h_pct)}">{trend_arrow} 24h {format_pct(coin.price_change_24h_pct)}</span></div>
-          </div>
-          {sparkline_svg(coin.sparkline, GREEN if coin.price_change_7d_pct >= 0 else RED)}
-          <div class="metric-grid"><span>IA <b>{ai_badge(rec.opportunity_score)}</b></span><span>Risque <b class="{risk_class}">{risk}</b></span><span>Confiance <b>{confidence}%</b></span></div>
-          <div class="volatility"><i style="width:{safe_width(vol * 4)}%"></i></div>
-          <div class="badge-row"><em>{trend_arrow} Tendance</em><em>Volatilité {vol:.1f}%</em>{f'<em>Position {format_money(owned_value)}</em>' if owned_value else ''}</div>
-        </article>
-        """,
-        unsafe_allow_html=True,
+    component_market_card(
+        coin,
+        owned_value=owned_value,
+        favorite=favorite,
+        pct_class=pct_class,
+        sparkline_svg=sparkline_svg,
+        risk_label=risk_label,
+        ai_badge=ai_badge,
+        confidence_for=confidence_for,
+        volatility_pct=volatility_pct,
+        safe_width=safe_width,
     )
 
 
 def render_holding_card(row: pd.Series, coin: MarketCoin | None) -> None:
-    pnl = float(row.get("pnl") or 0)
-    daily = coin.price_change_24h_pct if coin else 0
-    st.markdown(f"""<article class='coin-card holding-card'>
-      <div class='coin-row'><div class='coin-title'>{coin_logo(coin, str(row['symbol']))}<div><h3>{html.escape(str(row['name']))}</h3><p>{float(row['quantity']):,.8f} {html.escape(str(row['symbol']))}</p></div></div><div class='price-stack'><strong>{format_money(float(row['value']))}</strong><span class='{pct_class(pnl)}'>{format_money(pnl)} · {format_pct(float(row['pnl_pct'])) if not pd.isna(row['pnl_pct']) else '—'}</span></div></div>
-      {sparkline_svg(coin.sparkline if coin else [], GREEN if daily >= 0 else RED)}
-      <div class='metric-grid'><span>Prix moyen <b>{format_money(float(row['avg_cost']))}</b></span><span>Journalier <b class='{pct_class(daily)}'>{format_pct(daily)}</b></span><span>Allocation <b>{format_pct(float(row['allocation_pct']))}</b></span></div>
-    </article>""", unsafe_allow_html=True)
+    component_holding_card(row, coin, pct_class=pct_class, sparkline_svg=sparkline_svg)
+
 
 
 st.markdown(

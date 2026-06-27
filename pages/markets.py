@@ -6,7 +6,9 @@ from components.ui import render_section_head_card
 
 
 def render_markets(*, market_objects, fng_display: str, dominance: float, render_market_card) -> None:
-    render_section_head_card("Marchés", f"Fear & Greed {fng_display} · BTC {dominance:.1f}%")
+    dominance_value = float(dominance or 0)
+    market_objects = market_objects or []
+    render_section_head_card("Marchés", f"Fear & Greed {fng_display} · BTC {dominance_value:.1f}%")
     query = st.text_input("Recherche crypto", placeholder="BTC, ETH, SOL…")
     filtered = [c for c in market_objects if not query or query.lower() in c.name.lower() or query.upper() in c.symbol]
     st.markdown("<h3>Meilleures hausses</h3>", unsafe_allow_html=True)

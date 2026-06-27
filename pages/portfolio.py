@@ -25,16 +25,19 @@ def render_portfolio(*, portfolio, total_value: float, total_pnl: float, total_p
         render_empty_card("", "Portefeuille importé", connection_message, section_head=True, badge="CSV")
     else:
         render_empty_card("", "Synchronisation Binance indisponible", html.escape(connection_message), section_head=True, badge="Attention")
-    with st.expander("Ajouter ou modifier une position", expanded=portfolio.empty):
-        with st.form("holding_form", clear_on_submit=False):
-            coin_id = st.selectbox("Actif", options=market_ids, format_func=lambda cid: f"{market_lookup[cid].name} ({market_lookup[cid].symbol})")
-            quantity = st.number_input("Quantité", min_value=0.0, step=0.0001, format="%.8f")
-            avg_cost = st.number_input("Prix moyen", min_value=0.0, step=1.0, format="%.4f")
-            favorite = st.toggle("Favori", value=True)
-            if st.form_submit_button("Enregistrer la position", use_container_width=True):
-                coin = market_lookup[coin_id]
-                next_row = pd.DataFrame([{"coin_id": coin_id, "symbol": coin.symbol, "quantity": quantity, "avg_cost": avg_cost, "alert_below": 0, "alert_above": 0, "favorite": favorite, "notes": ""}])
-                st.session_state.portfolio = portfolio_service.load(pd.concat([st.session_state.portfolio[st.session_state.portfolio["coin_id"] != coin_id], next_row], ignore_index=True)); st.rerun()
+    if not market_ids:
+        render_empty_card("◌", "Données marché indisponibles", "Impossible d’ajouter ou modifier une position tant que les données marché sont absentes.")
+    else:
+        with st.expander("Ajouter ou modifier une position", expanded=portfolio.empty):
+            with st.form("holding_form", clear_on_submit=False):
+                coin_id = st.selectbox("Actif", options=market_ids, format_func=lambda cid: f"{market_lookup[cid].name} ({market_lookup[cid].symbol})")
+                quantity = st.number_input("Quantité", min_value=0.0, step=0.0001, format="%.8f")
+                avg_cost = st.number_input("Prix moyen", min_value=0.0, step=1.0, format="%.4f")
+                favorite = st.toggle("Favori", value=True)
+                if st.form_submit_button("Enregistrer la position", use_container_width=True):
+                    coin = market_lookup[coin_id]
+                    next_row = pd.DataFrame([{"coin_id": coin_id, "symbol": coin.symbol, "quantity": quantity, "avg_cost": avg_cost, "alert_below": 0, "alert_above": 0, "favorite": favorite, "notes": ""}])
+                    st.session_state.portfolio = portfolio_service.load(pd.concat([st.session_state.portfolio[st.session_state.portfolio["coin_id"] != coin_id], next_row], ignore_index=True)); st.rerun()
     for _, row in portfolio.iterrows(): render_holding_card(row, market_lookup.get(str(row['coin_id'])))
 
 

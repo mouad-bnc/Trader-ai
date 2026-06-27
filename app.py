@@ -230,9 +230,10 @@ if market_df.empty:
     market_objects = []
     st.session_state.watchlist = []
 else:
-    market_objects = market_service.market_objects(market_df)
-market_lookup = market_service.market_lookup(market_objects)
-market_ids = [coin.coin_id for coin in market_objects]
+    market_objects = market_service.market_objects(market_df) or []
+market_objects = market_objects or []
+market_lookup = market_service.market_lookup(market_objects) or {}
+market_ids = [coin.coin_id for coin in market_objects] if market_objects else []
 st.session_state.portfolio = portfolio_service.load(st.session_state.portfolio)
 portfolio_data = portfolio_service.build_data(st.session_state.portfolio, market_objects, market_lookup)
 portfolio = portfolio_data.holdings
@@ -242,15 +243,17 @@ total_pnl_pct = portfolio_data.total_pnl_pct
 daily_pnl = portfolio_data.daily_pnl
 daily_pnl_pct = portfolio_data.daily_pnl_pct
 fav_ids = portfolio_data.favorite_ids
-best_row = portfolio_data.best_row
-worst_row = portfolio_data.worst_row
+best_row = portfolio_data.best_row if portfolio_data.best_row is not None else pd.DataFrame()
+worst_row = portfolio_data.worst_row if portfolio_data.worst_row is not None else pd.DataFrame()
 
 st.markdown(f"<div class='app-shell'><div class='topbar'><span class='icon-btn'>☰</span><div class='brand'>{html.escape(APP_NAME)}</div><div class='nav-icons'><span class='icon-btn'>🔔</span><span class='icon-btn'>👤</span></div></div></div>", unsafe_allow_html=True)
 if market_data_unavailable:
     st.warning("Les données CoinGecko sont momentanément indisponibles.")
 screen = st.radio("Navigation", SECTIONS, horizontal=True, label_visibility="collapsed", key="screen")
 fng_value, fng_label = market_service.fear_greed()
+fng_label = fng_label or "Indisponible"
 dominance = market_service.btc_dominance(market_objects)
+dominance = float(dominance or 0.0)
 segments = portfolio_service.segment_allocation(total_value)
 fng_display = f"{fng_value}/100" if fng_value is not None else "Indisponible"
 connection_status = st.session_state.binance_connection_status

@@ -213,10 +213,24 @@ def sync_binance_portfolio(binance_client: BinanceReadOnlyClient | None = None) 
     return PortfolioService(binance_client).sync_binance_portfolio()
 
 
-def sync_portfolio(binance_client: BinanceReadOnlyClient | None = None) -> dict[str, object]:
-    """Wrapper public sûr pour les anciens appels de synchronisation Binance."""
-
-    return PortfolioService(binance_client).sync_portfolio()
+def sync_portfolio():
+    """Synchronise le portefeuille principal de manière sûre."""
+    try:
+        if "sync_binance_portfolio" in globals():
+            return sync_binance_portfolio()
+        return {
+            "status": "not_configured",
+            "message": "Connexion Binance non configurée.",
+            "portfolio": [],
+            "last_sync": None,
+        }
+    except Exception:
+        return {
+            "status": "error",
+            "message": "Synchronisation Binance indisponible.",
+            "portfolio": [],
+            "last_sync": None,
+        }
 
 
 __all__ = ["BinanceSyncResult", "PortfolioData", "PortfolioService", "sync_binance_portfolio", "sync_portfolio"]

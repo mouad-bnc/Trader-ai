@@ -7,20 +7,10 @@ from typing import Iterable
 import pandas as pd
 import streamlit as st
 
-from services.market_service import DEFAULT_COINS, MarketCoin, MarketService
-from components.badges import score_badge
-from components.cards import coin_logo, render_holding_card as component_holding_card, render_market_card as component_market_card
-from portfolio_analytics import format_money, format_pct, recommendation_for
-from services.news_service import NewsService
-from services.portfolio_service import PortfolioService
-from pages.bots import render_bots
-from pages.calculator import render_calculator
-from pages.home import render_home
-from pages.markets import render_markets
-from pages.news import render_news
-from pages.opportunities import render_opportunities
-from pages.portfolio import render_portfolio
-from pages.trader_ai import render_trader_ai
+from binance import BinanceReadOnlyClient
+from coingecko import DEFAULT_COINS, CoinGeckoClient, MarketCoin, markets_to_frame
+from portfolio_analytics import enrich_portfolio, format_money, format_pct, recommendation_for, triggered_alerts
+from portfolio_io import empty_portfolio, normalize_portfolio, parse_binance_spot_csv
 
 APP_NAME = "Mouad Saissi - Trader"
 APP_VERSION = "5.0"
@@ -63,6 +53,17 @@ def sparkline_svg(values: Iterable[float], stroke: str = GOLD) -> str:
     )
 
 
+def coin_logo(coin: MarketCoin | None, symbol: str) -> str:
+    if coin and coin.image:
+        return f"<img class='coin-logo' src='{html.escape(coin.image)}' alt='{html.escape(symbol)} logo'>"
+    return f"<div class='coin-fallback'>{html.escape(symbol[:1] or '✦')}</div>"
+
+
+def score_badge(score: int) -> str:
+    label = "Excellent" if score >= 75 else "Fort" if score >= 60 else "Neutre" if score >= 45 else "Risque"
+    return f"<span class='score-badge'><b>{score}</b><small>{label}</small></span>"
+
+
 def risk_label(coin: MarketCoin) -> tuple[str, str]:
     daily_range = ((coin.high_24h - coin.low_24h) / coin.current_price) * 100 if coin.current_price else 0
     if daily_range > 18 or coin.price_change_24h_pct < -12:
@@ -101,6 +102,32 @@ def one_sentence_summary(article: dict[str, object]) -> str:
 
 
 
+@st.cache_data(ttl=900, show_spinner=False)
+def fear_greed() -> tuple[int | None, str]:
+    """Read the public Fear & Greed index instead of inventing a value."""
+    try:
+        import requests
+        response = requests.get("https://api.alternative.me/fng/", params={"limit": 1, "format": "json"}, timeout=8)
+        response.raise_for_status()
+        payload = response.json()
+        latest = (payload.get("data") or [{}])[0]
+        return int(latest.get("value")), str(latest.get("value_classification") or "Marché")
+    except Exception:
+        return None, "Indisponible"
+
+
+def btc_dominance(markets: list[MarketCoin]) -> float:
+    total = sum(max(coin.market_cap, 0) for coin in markets)
+    btc = next((coin.market_cap for coin in markets if coin.coin_id == "bitcoin"), 0)
+    return (btc / total * 100) if total else 0
+
+
+def segment_allocation(total: float) -> dict[str, float]:
+    if total <= 0:
+        return {"Spot": 0, "Earn": 0, "Bots": 0}
+    return {"Spot": total * .72, "Earn": total * .18, "Bots": total * .10}
+
+
 def signal_label(score: int) -> str:
     if score >= 78: return "Acheter"
     if score >= 64: return "Renforcer"
@@ -118,23 +145,38 @@ def render_progress(label: str, value: int, detail: str = "") -> None:
 
 
 def render_market_card(coin: MarketCoin, owned_value: float = 0, favorite: bool = False) -> None:
-    component_market_card(
-        coin,
-        owned_value=owned_value,
-        favorite=favorite,
-        pct_class=pct_class,
-        sparkline_svg=sparkline_svg,
-        risk_label=risk_label,
-        ai_badge=ai_badge,
-        confidence_for=confidence_for,
-        volatility_pct=volatility_pct,
-        safe_width=safe_width,
+    rec = recommendation_for(coin)
+    risk, risk_class = risk_label(coin)
+    rank = f"#{coin.market_cap_rank}" if coin.market_cap_rank else "—"
+    heart = "♥" if favorite else "♡"
+    trend_arrow = "↗" if coin.price_change_24h_pct >= 0 else "↘"
+    vol = volatility_pct(coin)
+    confidence = confidence_for(coin)
+    st.markdown(
+        f"""
+        <article class="coin-card float-in">
+          <div class="coin-row">
+            <div class="coin-title">{coin_logo(coin, coin.symbol)}<div><h3>{html.escape(coin.name)}</h3><p>{html.escape(coin.symbol)} · Rang {rank}</p></div></div>
+            <div class="price-stack"><button class="fav" aria-label="favori">{heart}</button><strong>{format_money(coin.current_price)}</strong><span class="{pct_class(coin.price_change_24h_pct)}">{trend_arrow} 24h {format_pct(coin.price_change_24h_pct)}</span></div>
+          </div>
+          {sparkline_svg(coin.sparkline, GREEN if coin.price_change_7d_pct >= 0 else RED)}
+          <div class="metric-grid"><span>IA <b>{ai_badge(rec.opportunity_score)}</b></span><span>Risque <b class="{risk_class}">{risk}</b></span><span>Confiance <b>{confidence}%</b></span></div>
+          <div class="volatility"><i style="width:{safe_width(vol * 4)}%"></i></div>
+          <div class="badge-row"><em>{trend_arrow} Tendance</em><em>Volatilité {vol:.1f}%</em>{f'<em>Position {format_money(owned_value)}</em>' if owned_value else ''}</div>
+        </article>
+        """,
+        unsafe_allow_html=True,
     )
 
 
 def render_holding_card(row: pd.Series, coin: MarketCoin | None) -> None:
-    component_holding_card(row, coin, pct_class=pct_class, sparkline_svg=sparkline_svg)
-
+    pnl = float(row.get("pnl") or 0)
+    daily = coin.price_change_24h_pct if coin else 0
+    st.markdown(f"""<article class='coin-card holding-card'>
+      <div class='coin-row'><div class='coin-title'>{coin_logo(coin, str(row['symbol']))}<div><h3>{html.escape(str(row['name']))}</h3><p>{float(row['quantity']):,.8f} {html.escape(str(row['symbol']))}</p></div></div><div class='price-stack'><strong>{format_money(float(row['value']))}</strong><span class='{pct_class(pnl)}'>{format_money(pnl)} · {format_pct(float(row['pnl_pct'])) if not pd.isna(row['pnl_pct']) else '—'}</span></div></div>
+      {sparkline_svg(coin.sparkline if coin else [], GREEN if daily >= 0 else RED)}
+      <div class='metric-grid'><span>Prix moyen <b>{format_money(float(row['avg_cost']))}</b></span><span>Journalier <b class='{pct_class(daily)}'>{format_pct(daily)}</b></span><span>Allocation <b>{format_pct(float(row['allocation_pct']))}</b></span></div>
+    </article>""", unsafe_allow_html=True)
 
 
 st.markdown(
@@ -147,57 +189,20 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-market_service = MarketService()
-portfolio_service = PortfolioService()
-news_service = NewsService()
-default_state = {"portfolio": portfolio_service.empty(), "last_portfolio_sync": None, "binance_connection_status": "not_configured", "binance_connection_message": "Connexion Binance non configurée.", "watchlist": ["bitcoin", "ethereum", "solana"], "screen": "Accueil", "currency": "USD", "theme": "Premium Dark", "refresh_interval": "90 secondes"}
+client = CoinGeckoClient()
+default_state = {"portfolio": empty_portfolio(), "watchlist": ["bitcoin", "ethereum", "solana"], "screen": "Accueil", "currency": "USD", "theme": "Premium Dark", "refresh_interval": "90 secondes"}
 for key, value in default_state.items():
     if key not in st.session_state:
         st.session_state[key] = value
-
-# Synchronisation automatique du portefeuille Binance en lecture seule.
-previous_connection_status = st.session_state.binance_connection_status
-fallback_sync_result = {
-    "status": "not_configured",
-    "message": "Connexion Binance non configurée.",
-    "portfolio": [],
-    "last_sync": None,
-}
-try:
-    sync_result = portfolio_service.sync_binance_portfolio()
-except Exception:
-    sync_result = fallback_sync_result
-
-if isinstance(sync_result, dict):
-    sync_status = sync_result["status"]
-    sync_message = sync_result["message"]
-    sync_portfolio = sync_result["portfolio"]
-    sync_last_sync = sync_result["last_sync"]
-else:
-    sync_status = sync_result.connection_status
-    sync_message = sync_result.message
-    sync_portfolio = sync_result.portfolio
-    sync_last_sync = sync_result.synced_at
-
-st.session_state.binance_connection_status = sync_status
-st.session_state.binance_connection_message = sync_message
-if sync_last_sync:
-    st.session_state.last_portfolio_sync = sync_last_sync
-if sync_status == "connected":
-    st.session_state.portfolio = sync_portfolio
-elif sync_status == "not_configured" and previous_connection_status != "imported_csv":
-    st.session_state.portfolio = portfolio_service.empty()
 
 with st.sidebar:
     st.header("Studio de données")
     uploaded = st.file_uploader("Importer un CSV Spot", type=["csv"], help="Import éducatif uniquement. Aucune clé API ni exécution.")
     if uploaded is not None:
         try:
-            imported = portfolio_service.import_csv(uploaded)
+            imported = parse_binance_spot_csv(uploaded)
             if st.button("Utiliser le portefeuille importé", type="primary", use_container_width=True):
                 st.session_state.portfolio = imported
-                st.session_state.binance_connection_status = "imported_csv"
-                st.session_state.binance_connection_message = "Portefeuille importé depuis un CSV"
                 st.success(f"Importé {len(imported)} actifs.")
         except Exception as exc:
             st.warning(f"Import impossible : {html.escape(str(exc))}")
@@ -211,117 +216,186 @@ with st.sidebar:
 coin_ids = [coin.strip().lower() for coin in coin_ids_text.replace("\n", ",").split(",") if coin.strip()]
 if include_trending:
     try:
-        coin_ids.extend(market_service.trending_ids())
+        coin_ids.extend(client.trending_ids())
     except Exception:
         st.sidebar.warning("Les tendances CoinGecko sont momentanément indisponibles.")
 coin_ids = list(dict.fromkeys(coin_ids))
 
-market_data_unavailable = False
+@st.cache_data(ttl=90, show_spinner=False)
+def load_markets(ids: tuple[str, ...], currency: str) -> pd.DataFrame:
+    return markets_to_frame(client.fetch_markets(ids, currency=currency.lower()))
+
 try:
     if refresh:
-        market_service.clear_cache()
-    market_df = market_service.prices(tuple(coin_ids), st.session_state.currency)
+        load_markets.clear()
+    market_df = load_markets(tuple(coin_ids), st.session_state.currency)
 except Exception:
-    market_data_unavailable = True
-    market_df = pd.DataFrame()
-
+    st.warning("Les données CoinGecko sont momentanément indisponibles. Réessaie dans quelques instants.")
+    st.stop()
 if market_df.empty:
-    market_data_unavailable = True
-    market_objects = []
-    st.session_state.watchlist = []
-else:
-    market_objects = market_service.market_objects(market_df) or []
-market_objects = market_objects or []
-market_lookup = market_service.market_lookup(market_objects) or {}
-market_ids = [coin.coin_id for coin in market_objects] if market_objects else []
-st.session_state.portfolio = portfolio_service.load(st.session_state.portfolio)
-portfolio_data = portfolio_service.build_data(st.session_state.portfolio, market_objects, market_lookup)
-portfolio = portfolio_data.holdings
-total_value = portfolio_data.total_value
-total_pnl = portfolio_data.total_pnl
-total_pnl_pct = portfolio_data.total_pnl_pct
-daily_pnl = portfolio_data.daily_pnl
-daily_pnl_pct = portfolio_data.daily_pnl_pct
-fav_ids = portfolio_data.favorite_ids
-best_row = portfolio_data.best_row if portfolio_data.best_row is not None else pd.DataFrame()
-worst_row = portfolio_data.worst_row if portfolio_data.worst_row is not None else pd.DataFrame()
+    st.warning("Ajoute des IDs CoinGecko valides pour commencer."); st.stop()
+
+market_objects = [MarketCoin(**row.to_dict()) for _, row in market_df.iterrows()]
+market_lookup = {coin.coin_id: coin for coin in market_objects}
+market_ids = [coin.coin_id for coin in market_objects]
+st.session_state.portfolio = normalize_portfolio(st.session_state.portfolio)
+portfolio = enrich_portfolio(st.session_state.portfolio, market_objects)
+total_value = float(portfolio["value"].sum()) if not portfolio.empty else 0.0
+total_cost = float(portfolio["cost_basis"].sum()) if not portfolio.empty else 0.0
+total_pnl = total_value - total_cost
+total_pnl_pct = (total_pnl / total_cost * 100) if total_cost else 0.0
+daily_pnl = sum(float(row["value"]) * (float(market_lookup[row["coin_id"]].price_change_24h_pct) / 100) for _, row in portfolio.iterrows() if row["coin_id"] in market_lookup)
+daily_pnl_pct = (daily_pnl / max(total_value - daily_pnl, 1) * 100) if total_value else 0.0
+alerts = triggered_alerts(st.session_state.portfolio, market_objects)
+fav_ids = set(st.session_state.portfolio.loc[st.session_state.portfolio["favorite"], "coin_id"]) if not st.session_state.portfolio.empty else set()
+best_row = portfolio.sort_values("pnl_pct", ascending=False).head(1) if not portfolio.empty else pd.DataFrame()
+worst_row = portfolio.sort_values("pnl_pct", ascending=True).head(1) if not portfolio.empty else pd.DataFrame()
 
 st.markdown(f"<div class='app-shell'><div class='topbar'><span class='icon-btn'>☰</span><div class='brand'>{html.escape(APP_NAME)}</div><div class='nav-icons'><span class='icon-btn'>🔔</span><span class='icon-btn'>👤</span></div></div></div>", unsafe_allow_html=True)
-if market_data_unavailable:
-    st.warning("Les données CoinGecko sont momentanément indisponibles.")
 screen = st.radio("Navigation", SECTIONS, horizontal=True, label_visibility="collapsed", key="screen")
-fng_value, fng_label = market_service.fear_greed()
-fng_label = fng_label or "Indisponible"
-dominance = market_service.btc_dominance(market_objects)
-dominance = float(dominance or 0.0)
-segments = portfolio_service.segment_allocation(total_value)
+fng_value, fng_label = fear_greed()
+dominance = btc_dominance(market_objects)
+segments = segment_allocation(total_value)
 fng_display = f"{fng_value}/100" if fng_value is not None else "Indisponible"
-connection_status = st.session_state.binance_connection_status
-connection_message = st.session_state.binance_connection_message
-last_portfolio_sync = st.session_state.last_portfolio_sync
-binance_configured = portfolio_service.binance_configured
+
+def render_home() -> None:
+    st.markdown("<div class='hero'><p>Bonjour Mouad 👋</p><h1>Votre cockpit crypto</h1></div>", unsafe_allow_html=True)
+    top_gain = best_row.iloc[0] if not best_row.empty else None
+    top_loss = worst_row.iloc[0] if not worst_row.empty else None
+    if portfolio.empty and not BinanceReadOnlyClient().configured:
+        st.markdown("""<section class='empty-card'><div class='empty-icon'>⌁</div><h2>Connectez Binance pour afficher votre portefeuille.</h2><p class='muted'>Vos soldes, votre allocation et votre PnL apparaîtront ici dès qu'une connexion lecture seule sera disponible.</p></section>""", unsafe_allow_html=True)
+        if st.button("Connecter Binance", use_container_width=True):
+            st.toast("Ajoutez BINANCE_API_KEY et BINANCE_API_SECRET côté serveur pour activer la synchronisation.")
+    else:
+        st.markdown(f"""
+        <section class='portfolio-card float-in'><span class='eyebrow'>TABLEAU DE BORD</span><div class='value'>{format_money(total_value)}</div>
+          <div class='quick-grid'><div class='mini-stat'><span>Variation du jour</span><b class='{pct_class(daily_pnl)}'>{format_money(daily_pnl)}<br>{format_pct(daily_pnl_pct)}</b></div><div class='mini-stat'><span>PnL global</span><b class='{pct_class(total_pnl)}'>{format_money(total_pnl)}<br>{format_pct(total_pnl_pct)}</b></div><div class='mini-stat'><span>BTC dominance</span><b>{dominance:.1f}%</b></div></div>
+          {sparkline_svg([sum((market_lookup.get(str(r['coin_id'])).sparkline[i] if market_lookup.get(str(r['coin_id'])) and len(market_lookup[str(r['coin_id'])].sparkline)>i else 0)*float(r['quantity']) for _, r in portfolio.iterrows()) for i in range(0, 42)] if not portfolio.empty else [coin.current_price for coin in market_objects[:8]])}
+        </section>""", unsafe_allow_html=True)
+    st.markdown("<section class='glass-card mission'><h2>Mission du jour</h2><ul><li>✓ Vérifier la valeur totale</li><li>✓ Lire les alertes de marché</li><li>✓ Identifier une opportunité à surveiller</li></ul></section>", unsafe_allow_html=True)
+    gain_txt = f"{top_gain['symbol']} {format_money(float(top_gain['pnl']))}" if top_gain is not None else "Ajoute une position"
+    loss_txt = f"{top_loss['symbol']} {format_money(float(top_loss['pnl']))}" if top_loss is not None else "Ajoute une position"
+    if portfolio.empty:
+        st.markdown(f"<section class='glass-card'><div class='metric-grid'><span>Fear & Greed <b>{fng_display}<br>{fng_label}</b></span><span>BTC Dominance <b>{dominance:.1f}%</b></span><span>Top Movers <b>{len(market_objects)} suivis</b></span></div></section>", unsafe_allow_html=True)
+    else:
+        st.markdown(f"<section class='glass-card'><div class='quick-grid'><div class='mini-stat'><span>Spot</span><b>{format_money(total_value)}</b></div><div class='mini-stat'><span>Actifs</span><b>{len(portfolio)}</b></div><div class='mini-stat'><span>PnL</span><b class='{pct_class(total_pnl)}'>{format_pct(total_pnl_pct)}</b></div></div><div class='metric-grid'><span>Top gain <b class='positive'>{gain_txt}</b></span><span>Top perte <b class='negative'>{loss_txt}</b></span><span>Fear & Greed <b>{fng_display}<br>{fng_label}</b></span></div></section>", unsafe_allow_html=True)
 
 
-if screen == "Accueil":
-    render_home(
-        best_row=best_row,
-        worst_row=worst_row,
-        portfolio=portfolio,
-        market_lookup=market_lookup,
-        market_objects=market_objects,
-        total_value=total_value,
-        daily_pnl=daily_pnl,
-        daily_pnl_pct=daily_pnl_pct,
-        total_pnl=total_pnl,
-        total_pnl_pct=total_pnl_pct,
-        dominance=dominance,
-        fng_display=fng_display,
-        fng_label=fng_label,
-        pct_class=pct_class,
-        sparkline_svg=sparkline_svg,
-        binance_configured=binance_configured,
-        connection_status=connection_status,
-        connection_message=connection_message,
-    )
-elif screen == "Marchés":
-    render_markets(
-        market_objects=market_objects,
-        fng_display=fng_display,
-        dominance=dominance,
-        render_market_card=render_market_card,
-    )
-elif screen == "Portefeuille":
-    render_portfolio(
-        portfolio=portfolio,
-        total_value=total_value,
-        total_pnl=total_pnl,
-        total_pnl_pct=total_pnl_pct,
-        market_ids=market_ids,
-        market_lookup=market_lookup,
-        pct_class=pct_class,
-        render_holding_card=render_holding_card,
-        portfolio_service=portfolio_service,
-        connection_status=connection_status,
-        connection_message=connection_message,
-        last_sync=last_portfolio_sync,
-    )
-elif screen == "Bots":
-    render_bots()
-elif screen == "Actualités":
-    render_news(
-        news_service=news_service,
-        one_sentence_summary=one_sentence_summary,
-    )
-elif screen == "Calculateur":
-    render_calculator(pct_class=pct_class)
-elif screen == "Opportunités":
-    render_opportunities(
-        market_objects=market_objects,
-        portfolio=portfolio,
-        confidence_for=confidence_for,
-        coin_logo=coin_logo,
-        score_badge=score_badge,
-        signal_label=signal_label,
-    )
-elif screen == "Trader IA":
-    render_trader_ai(market_objects=market_objects, portfolio=portfolio)
+
+def render_markets() -> None:
+    st.markdown(f"<section class='glass-card'><div class='section-head'><h2>Marchés</h2><span class='muted'>Fear & Greed {fng_display} · BTC {dominance:.1f}%</span></div></section>", unsafe_allow_html=True)
+    query = st.text_input("Recherche crypto", placeholder="BTC, ETH, SOL…")
+    filtered = [c for c in market_objects if not query or query.lower() in c.name.lower() or query.upper() in c.symbol]
+    st.markdown("<h3>Meilleures hausses</h3>", unsafe_allow_html=True)
+    for coin in sorted(filtered, key=lambda c: c.price_change_24h_pct, reverse=True)[:3]: render_market_card(coin, favorite=coin.coin_id in st.session_state.watchlist)
+    st.markdown("<h3>Plus fortes baisses</h3>", unsafe_allow_html=True)
+    for coin in sorted(filtered, key=lambda c: c.price_change_24h_pct)[:3]: render_market_card(coin, favorite=coin.coin_id in st.session_state.watchlist)
+    st.markdown("<h3>Liste de suivi</h3>", unsafe_allow_html=True)
+    for coin in [c for c in filtered if c.coin_id in st.session_state.watchlist][:5]: render_market_card(coin, favorite=True)
+
+
+
+def render_portfolio() -> None:
+    binance = BinanceReadOnlyClient()
+    if portfolio.empty:
+        st.markdown("<section class='empty-card'><div class='empty-icon'>◒</div><h2>Votre portefeuille est prêt.</h2><p class='muted'>Connectez Binance ou ajoutez une position pour afficher la valeur totale, l'allocation, le donut et la liste des actifs.</p></section>", unsafe_allow_html=True)
+    else:
+        st.markdown(f"<section class='portfolio-card'><span class='eyebrow'>PORTEFEUILLE</span><div class='value'>{format_money(total_value)}</div><div class='donut'></div><div class='quick-grid'><div class='mini-stat'><span>Spot</span><b>{format_money(total_value)}</b></div><div class='mini-stat'><span>Allocation</span><b>{len(portfolio)} actifs</b></div><div class='mini-stat'><span>PnL</span><b class='{pct_class(total_pnl)}'>{format_pct(total_pnl_pct)}</b></div></div></section>", unsafe_allow_html=True)
+    if not binance.configured:
+        st.markdown("<section class='empty-card'><div class='section-head'><h3>Binance</h3><span class='pill'>Hors ligne</span></div><p class='muted'>API absente. Activez une clé lecture seule pour synchroniser automatiquement vos soldes Spot.</p></section>", unsafe_allow_html=True)
+        st.button("Connecter Binance", use_container_width=True)
+    else:
+        try:
+            assets = binance.spot_assets()
+            st.markdown("<h3>Binance Spot lecture seule</h3>", unsafe_allow_html=True)
+            for asset in assets[:12]:
+                st.markdown(f"<div class='glass-card'><div class='metric-line'><b>{asset.symbol}</b><span>{asset.quantity:,.8f}</span></div><div class='metric-line'><span>Prix actuel</span><b>{format_money(asset.current_price)}</b></div><div class='metric-line'><span>Valeur</span><b>{format_money(asset.value)}</b></div></div>", unsafe_allow_html=True)
+        except Exception as exc:
+            st.warning(f"Lecture Binance indisponible : {html.escape(str(exc))}")
+    with st.expander("Ajouter ou modifier une position", expanded=portfolio.empty):
+        with st.form("holding_form", clear_on_submit=False):
+            coin_id = st.selectbox("Actif", options=market_ids, format_func=lambda cid: f"{market_lookup[cid].name} ({market_lookup[cid].symbol})")
+            quantity = st.number_input("Quantité", min_value=0.0, step=0.0001, format="%.8f")
+            avg_cost = st.number_input("Prix moyen", min_value=0.0, step=1.0, format="%.4f")
+            favorite = st.toggle("Favori", value=True)
+            if st.form_submit_button("Enregistrer la position", use_container_width=True):
+                coin = market_lookup[coin_id]
+                next_row = pd.DataFrame([{"coin_id": coin_id, "symbol": coin.symbol, "quantity": quantity, "avg_cost": avg_cost, "alert_below": 0, "alert_above": 0, "favorite": favorite, "notes": ""}])
+                st.session_state.portfolio = normalize_portfolio(pd.concat([st.session_state.portfolio[st.session_state.portfolio["coin_id"] != coin_id], next_row], ignore_index=True)); st.rerun()
+    for _, row in portfolio.iterrows(): render_holding_card(row, market_lookup.get(str(row['coin_id'])))
+
+
+
+def render_bots() -> None:
+    st.markdown("<section class='empty-card'><div class='empty-icon'>⌘</div><h2>Bots</h2><p class='muted'>Aucun bot connecté. Les performances réelles s'afficheront uniquement après connexion d'une source de données.</p></section>", unsafe_allow_html=True)
+
+
+
+def render_news() -> None:
+    @st.cache_data(ttl=300, show_spinner=False)
+    def load_news() -> list[dict[str, object]]: return client.fetch_news(per_page=10)
+    try: articles = load_news() or demo_news()
+    except Exception: articles = demo_news()
+    if not articles:
+        st.markdown("<section class='empty-card'><div class='empty-icon'>▧</div><h2>Feed indisponible</h2><p class='muted'>Aucune actualité vérifiée n'est disponible pour le moment. Réessayez après la prochaine synchronisation.</p></section>", unsafe_allow_html=True)
+    for article in articles[:10]:
+        tags = article.get('tags') or [tag for tag in ['BTC','ETH','SOL','DOGE','SUI'] if tag.lower() in str(article).lower()] or ['Crypto']
+        image = html.escape(str(article.get('thumb_2x') or article.get('image') or article.get('urlToImage') or ''))
+        image_style = f" style=\"background-image:url('{image}')\"" if image else ""
+        source = html.escape(str(article.get('source') or article.get('source_name') or 'Source crypto'))
+        st.markdown(f"<article class='news-card'><div class='news-img'{image_style}></div><span class='eyebrow'>{source}</span><h3>{html.escape(str(article.get('title') or 'Actualité crypto'))}</h3><p class='muted'>{html.escape(str(article.get('date') or article.get('created_at') or 'Maintenant'))}</p><p>{html.escape(one_sentence_summary(article))}</p><div class='badge-row'>{''.join(f'<em>{html.escape(str(t))}</em>' for t in tags)}</div></article>", unsafe_allow_html=True)
+
+
+
+def render_calculator() -> None:
+    st.markdown("<section class='glass-card'><h2>Calculateur</h2><p class='muted'>Résultat instantané.</p></section>", unsafe_allow_html=True)
+    c1, c2 = st.columns(2)
+    capital = c1.number_input("Capital", min_value=0.0, value=1000.0)
+    prix = c2.number_input("Prix actuel", min_value=0.000001, value=100.0, format="%.6f")
+    entree = c1.number_input("Prix d’entrée", min_value=0.000001, value=90.0, format="%.6f")
+    sortie = c2.number_input("Objectif gain", min_value=0.000001, value=120.0, format="%.6f")
+    stop = c1.number_input("Seuil de protection", min_value=0.000001, value=80.0, format="%.6f")
+    dca = c2.number_input("Achat DCA", min_value=0.0, value=250.0)
+    qty = capital / entree if entree else 0
+    avg = (capital + dca) / (qty + dca / prix) if prix and qty + dca / prix else entree
+    roi = (sortie - avg) / avg * 100
+    risk = max(avg - stop, 0); reward = max(sortie - avg, 0)
+    st.markdown(f"<section class='portfolio-card'><div class='metric-grid'><span>Prix moyen <b>{format_money(avg)}</b></span><span>DCA <b>{format_money(dca)}</b></span><span>ROI <b class='{pct_class(roi)}'>{format_pct(roi)}</b></span><span>Ratio risque/rendement <b>{(reward/risk if risk else 0):.2f}</b></span><span>Taille position <b>{qty:.6f}</b></span><span>Seuil de protection <b>{format_money(stop)}</b></span></div></section>", unsafe_allow_html=True)
+
+
+
+def render_opportunities() -> None:
+    st.markdown("<section class='glass-card'><h2>Opportunités</h2><p class='notice'>Analyse indicative uniquement.</p></section>", unsafe_allow_html=True)
+    for coin in sorted(market_objects, key=lambda c: recommendation_for(c).opportunity_score, reverse=True)[:12]:
+        rec = recommendation_for(coin); conf = confidence_for(coin)
+        st.markdown(f"<article class='coin-card'><div class='coin-row'><div class='coin-title'>{coin_logo(coin, coin.symbol)}<div><h3>{coin.name}</h3><p>{coin.symbol}</p></div></div>{score_badge(rec.opportunity_score)}</div><div class='metric-grid'><span>Signal <b>{signal_label(rec.opportunity_score)}</b></span><span>Confiance <b>{conf}%</b></span><span>Prix <b>{format_money(coin.current_price)}</b></span></div><p class='muted'>{html.escape(rec.rationale)}</p></article>", unsafe_allow_html=True)
+
+
+
+def render_trader_ai() -> None:
+    if "messages" not in st.session_state:
+        st.session_state.messages = [{"role": "bot", "text": "Bonjour Mouad 👋\n\nJe suis Trader.\n\nJe peux analyser :\n• ton portefeuille\n• le marché\n• une crypto\n• les news\n• les opportunités."}]
+    for msg in st.session_state.messages:
+        st.markdown(f"<div class='chat-bubble {'bot' if msg['role']=='bot' else 'user'}'>{html.escape(msg['text'])}</div>", unsafe_allow_html=True)
+    prompt = st.text_input("Message", placeholder="Demandez à Trader d’analyser votre portefeuille...")
+    for suggestion in ["Analyser mon portefeuille", "Faut-il acheter SOL ?", "DOGE est-il encore intéressant ?", "Meilleure opportunité aujourd’hui", "Calculer mon prix moyen"]:
+        if st.button(suggestion, use_container_width=True): prompt = suggestion
+    if prompt:
+        best = max(market_objects, key=lambda c: recommendation_for(c).opportunity_score)
+        st.session_state.messages.append({"role":"user","text":prompt})
+        st.session_state.messages.append({"role":"bot","text":f"Analyse indicative : {best.name} obtient le meilleur score actuel ({recommendation_for(best).opportunity_score}/100). Vérifie toujours ton risque, ton prix moyen et ton stop avant toute décision."})
+        st.rerun()
+
+
+SCREEN_RENDERERS = {
+    "Accueil": render_home,
+    "Marchés": render_markets,
+    "Portefeuille": render_portfolio,
+    "Bots": render_bots,
+    "Actualités": render_news,
+    "Calculateur": render_calculator,
+    "Opportunités": render_opportunities,
+    "Trader IA": render_trader_ai,
+}
+
+SCREEN_RENDERERS[screen]()

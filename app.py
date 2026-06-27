@@ -3,7 +3,14 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from analytics import enrich_portfolio, format_money, format_pct, portfolio_performance_frame, recommendation_for, triggered_alerts
+from portfolio_analytics import (
+    enrich_portfolio,
+    format_money,
+    format_pct,
+    portfolio_performance_frame,
+    recommendation_for,
+    triggered_alerts,
+)
 from coingecko import DEFAULT_COINS, CoinGeckoClient, MarketCoin, markets_to_frame
 from portfolio_io import empty_portfolio, normalize_portfolio, parse_binance_spot_csv
 

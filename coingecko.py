@@ -75,6 +75,20 @@ class CoinGeckoClient:
             raise RuntimeError("CoinGecko returned an unexpected market payload.")
         return [self._parse_market_coin(item) for item in data]
 
+
+    def fetch_news(self, per_page: int = 10, coin_id: str | None = None) -> list[dict[str, object]]:
+        """Fetch latest CoinGecko news when the public endpoint is available."""
+
+        params: dict[str, object] = {"per_page": max(1, min(20, per_page)), "page": 1}
+        if coin_id:
+            params["coin_id"] = coin_id
+        data = self._get("/news", params)
+        if isinstance(data, dict):
+            articles = data.get("data") or data.get("news") or data.get("articles") or []
+        else:
+            articles = data if isinstance(data, list) else []
+        return [item for item in articles if isinstance(item, dict)]
+
     def trending_ids(self, limit: int = 7) -> list[str]:
         data = self._get("/search/trending")
         if not isinstance(data, dict):

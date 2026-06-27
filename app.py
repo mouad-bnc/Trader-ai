@@ -157,19 +157,35 @@ for key, value in default_state.items():
 
 # Synchronisation automatique du portefeuille Binance en lecture seule.
 previous_connection_status = st.session_state.binance_connection_status
+fallback_sync_result = {
+    "status": "not_configured",
+    "message": "Connexion Binance non configurée.",
+    "portfolio": [],
+    "last_sync": None,
+}
 try:
     sync_result = portfolio_service.sync_binance_portfolio()
-except AttributeError:
-    sync_result = portfolio_service.sync_portfolio()
 except Exception:
-    sync_result = portfolio_service._sync_error("not_configured", "Connexion Binance non configurée.")
-st.session_state.binance_connection_status = sync_result.connection_status
-st.session_state.binance_connection_message = sync_result.message
-if sync_result.synced_at:
-    st.session_state.last_portfolio_sync = sync_result.synced_at
-if sync_result.connection_status == "connected":
-    st.session_state.portfolio = sync_result.portfolio
-elif sync_result.connection_status == "not_configured" and previous_connection_status != "imported_csv":
+    sync_result = fallback_sync_result
+
+if isinstance(sync_result, dict):
+    sync_status = sync_result["status"]
+    sync_message = sync_result["message"]
+    sync_portfolio = sync_result["portfolio"]
+    sync_last_sync = sync_result["last_sync"]
+else:
+    sync_status = sync_result.connection_status
+    sync_message = sync_result.message
+    sync_portfolio = sync_result.portfolio
+    sync_last_sync = sync_result.synced_at
+
+st.session_state.binance_connection_status = sync_status
+st.session_state.binance_connection_message = sync_message
+if sync_last_sync:
+    st.session_state.last_portfolio_sync = sync_last_sync
+if sync_status == "connected":
+    st.session_state.portfolio = sync_portfolio
+elif sync_status == "not_configured" and previous_connection_status != "imported_csv":
     st.session_state.portfolio = portfolio_service.empty()
 
 with st.sidebar:

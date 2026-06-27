@@ -13,10 +13,10 @@ from portfolio_analytics import enrich_portfolio, format_money, format_pct, reco
 from portfolio_io import empty_portfolio, normalize_portfolio, parse_binance_spot_csv
 
 APP_NAME = "Trader"
-APP_VERSION = "4.0"
+APP_VERSION = "5.0"
 GOLD = "#F3BA2F"
-GREEN = "#16C784"
-RED = "#EA3943"
+GREEN = "#02C076"
+RED = "#F6465D"
 
 st.set_page_config(page_title=f"{APP_NAME} {APP_VERSION}", page_icon="✦", layout="centered", initial_sidebar_state="collapsed")
 
@@ -101,8 +101,18 @@ def one_sentence_summary(article: dict[str, object]) -> str:
 
 
 
-def fear_greed() -> tuple[int, str]:
-    return 63, "Appétit modéré"
+@st.cache_data(ttl=900, show_spinner=False)
+def fear_greed() -> tuple[int | None, str]:
+    """Read the public Fear & Greed index instead of inventing a value."""
+    try:
+        import requests
+        response = requests.get("https://api.alternative.me/fng/", params={"limit": 1, "format": "json"}, timeout=8)
+        response.raise_for_status()
+        payload = response.json()
+        latest = (payload.get("data") or [{}])[0]
+        return int(latest.get("value")), str(latest.get("value_classification") or "Marché")
+    except Exception:
+        return None, "Indisponible"
 
 
 def btc_dominance(markets: list[MarketCoin]) -> float:
@@ -126,11 +136,8 @@ def signal_label(score: int) -> str:
 
 
 def demo_news() -> list[dict[str, object]]:
-    return [
-        {"title":"Bitcoin consolide pendant que la dominance reste élevée", "source":"Mode démonstration", "date":"Aujourd’hui", "summary":"Le marché reste attentif aux flux sur BTC et aux niveaux de support court terme.", "tags":["BTC"]},
-        {"title":"Solana attire les volumes sur les actifs à bêta élevé", "source":"Mode démonstration", "date":"Aujourd’hui", "summary":"SOL conserve une place importante dans la liste de suivi grâce à sa liquidité.", "tags":["SOL", "SUI"]},
-        {"title":"Ethereum surveillé avant le prochain mouvement du marché", "source":"Mode démonstration", "date":"Aujourd’hui", "summary":"ETH reste une référence pour mesurer le risque sur les altcoins majeurs.", "tags":["ETH", "DOGE"]},
-    ]
+    """Return no synthetic news; the UI renders a premium empty state instead."""
+    return []
 
 def render_progress(label: str, value: int, detail: str = "") -> None:
     st.markdown(f"<div class='progress-row'><span>{html.escape(label)}</span><b>{value}%</b></div><div class='progress'><i style='width:{safe_width(value)}%'></i></div>{f'<p class=muted>{html.escape(detail)}</p>' if detail else ''}", unsafe_allow_html=True)
@@ -174,16 +181,15 @@ def render_holding_card(row: pd.Series, coin: MarketCoin | None) -> None:
 st.markdown(
     """
 <style>
-:root{--bg:#0B0E11;--card:#1A1D24;--gold:#F3BA2F;--text:#fff;--muted:#9AA4B2;--green:#16C784;--red:#EA3943;--line:rgba(255,255,255,.10);--glass:rgba(26,29,36,.72);}
-.stApp{background:radial-gradient(circle at 12% -10%,rgba(243,186,47,.23),transparent 32%),radial-gradient(circle at 100% 0%,rgba(255,255,255,.07),transparent 27%),linear-gradient(180deg,#0B0E11 0%,#07090c 100%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Inter",sans-serif;}
-.block-container{max-width:430px!important;padding:5.7rem .95rem 2rem!important;overflow-x:hidden}#MainMenu,footer,header,[data-testid="stToolbar"],[data-testid="stDecoration"],.stDeployButton{display:none!important}.stApp *{box-sizing:border-box}.topbar,.section-head,.coin-row,.coin-title,.metric-line,.progress-row,.setting-row{display:flex;align-items:center;justify-content:space-between;gap:.8rem}.topbar{position:sticky;top:.4rem;z-index:99;margin:-.15rem 0 .8rem;padding:.62rem .7rem;border:1px solid var(--line);border-radius:22px;background:rgba(11,14,17,.72);backdrop-filter:blur(22px);box-shadow:0 18px 50px rgba(0,0,0,.28)}.hello h1{font-size:1.42rem;letter-spacing:-.055em;margin:.1rem 0}.muted,.hello p,.coin-title p,.mini-stat span{color:var(--muted);font-size:.76rem;margin:.12rem 0}.icon-btn,.fav{width:44px;height:44px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(145deg,rgba(255,255,255,.08),rgba(255,255,255,.02));color:#fff;display:grid;place-items:center;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}.portfolio-card,.coin-card,.glass-card,.ai-card{border-radius:22px;background:linear-gradient(145deg,rgba(255,255,255,.09),rgba(255,255,255,.03)),var(--glass);border:1px solid var(--line);box-shadow:0 22px 55px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.10);backdrop-filter:blur(20px);padding:1rem;margin:.85rem 0;overflow:hidden}.portfolio-card{background:radial-gradient(circle at 14% 0%,rgba(243,186,47,.28),transparent 45%),linear-gradient(145deg,#252833,#11141b)}.eyebrow{display:inline-flex;align-items:center;gap:.35rem;color:#161102;background:linear-gradient(135deg,var(--gold),#FFE29A);font-weight:900;font-size:.66rem;border-radius:999px;padding:.28rem .55rem}.value{font-size:2.15rem;font-weight:900;letter-spacing:-.075em;margin:.55rem 0 .25rem}.quick-grid,.metric-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.58rem}.allocation-list{display:grid;gap:.5rem;margin-top:.8rem}.allocation-pill{display:grid;grid-template-columns:52px 1fr 48px;gap:.55rem;align-items:center}.allocation-bar{height:8px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden}.allocation-bar i,.volatility i{display:block;height:100%;background:linear-gradient(90deg,#8A6419,var(--gold),#FFF2BF);border-radius:99px}.volatility{height:7px;background:rgba(255,255,255,.07);border-radius:99px;margin:.2rem 0 .55rem}.chart-large{height:230px}.news-card h3{font-size:1rem;line-height:1.18;margin:.2rem 0}.assistant-grid{display:grid;gap:.75rem}.assistant-card{border-radius:20px;padding:.9rem;background:rgba(255,255,255,.055);border:1px solid var(--line)}.mini-stat,.metric-grid span{background:rgba(0,0,0,.22);border:1px solid var(--line);border-radius:17px;padding:.72rem .62rem;min-width:0}.mini-stat b,.metric-grid b{display:block;font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.positive,.risk-low{color:var(--green)!important}.negative,.risk-high{color:var(--red)!important}.risk-med{color:var(--gold)!important}.sparkline{width:100%;height:64px;margin:.7rem 0}.coin-card{transition:transform .22s ease,border-color .22s ease}.coin-card:hover{transform:translateY(-2px);border-color:rgba(243,186,47,.35)}.coin-logo,.coin-fallback{width:42px;height:42px;border-radius:50%;box-shadow:0 0 0 1px rgba(255,255,255,.12)}.coin-fallback{display:grid;place-items:center;background:linear-gradient(135deg,var(--gold),#8b681d);color:#111;font-weight:900}.coin-title{justify-content:flex-start}.coin-title h3{font-size:1rem;letter-spacing:-.04em;margin:0}.price-stack{text-align:right;display:flex;align-items:flex-end;flex-direction:column;gap:.15rem}.price-stack strong{font-size:.98rem}.price-stack span{font-size:.7rem}.fav{width:30px;height:30px;border-radius:11px;color:var(--gold)}.badge-row{display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.7rem}.badge-row em{font-style:normal;font-weight:800;font-size:.68rem;padding:.32rem .52rem;border-radius:999px;border:1px solid rgba(243,186,47,.25);background:rgba(243,186,47,.12);color:#FFE29A}.badge-row .risk-high{border-color:rgba(234,57,67,.35);background:rgba(234,57,67,.13);color:#ff9aa1}.badge-row .risk-med{border-color:rgba(243,186,47,.35)}.badge-row .risk-low{border-color:rgba(22,199,132,.35);background:rgba(22,199,132,.13);color:#9ff0cc}.score-badge{min-width:62px;height:46px;border-radius:16px;display:flex;align-items:center;justify-content:center;gap:.1rem;flex-direction:column;background:linear-gradient(135deg,var(--gold),#74551a);color:#0B0E11;box-shadow:0 12px 35px rgba(243,186,47,.22)}.score-badge b{font-size:1.05rem}.score-badge small{font-size:.56rem;font-weight:900;text-transform:uppercase}.progress{height:9px;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden;margin:.35rem 0 .7rem}.progress i{display:block;height:100%;background:linear-gradient(90deg,#8A6419,var(--gold),#FFF2BF);border-radius:999px;animation:loadbar .8s ease}.progress-row span{font-size:.78rem;color:#DDE2EA}.progress-row b{font-size:.78rem;color:var(--gold)}.stButton>button,.stDownloadButton>button{border-radius:17px!important;min-height:46px!important;border:1px solid rgba(243,186,47,.35)!important;background:linear-gradient(135deg,rgba(243,186,47,.22),rgba(255,255,255,.06))!important;color:#fff!important;transition:transform .18s ease}.stButton>button:active{transform:scale(.98)}.stTextInput input,.stNumberInput input,.stTextArea textarea,.stSelectbox div[data-baseweb="select"]{border-radius:16px!important;background:rgba(255,255,255,.06)!important;border-color:var(--line)!important;color:#fff!important;min-height:46px}.stMultiSelect div[data-baseweb="select"]{border-radius:16px!important;background:rgba(255,255,255,.06)!important}.stExpander{border:1px solid var(--line)!important;border-radius:22px!important;background:rgba(26,29,36,.5)!important;overflow:hidden}.skeleton{height:82px;border-radius:22px;background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.12),rgba(255,255,255,.05));background-size:220% 100%;animation:shimmer 1.4s infinite}.settings-title{font-size:1.2rem;margin:.1rem 0;letter-spacing:-.04em}.setting-row{padding:.75rem 0;border-bottom:1px solid var(--line)}div[role="radiogroup"]{position:fixed;left:50%;top:.55rem;transform:translateX(-50%);z-index:1000;width:min(410px,calc(100vw - 18px));display:flex!important;gap:.32rem;overflow-x:auto;background:rgba(11,14,17,.90);border:1px solid var(--line);backdrop-filter:blur(24px);border-radius:24px;padding:.35rem;box-shadow:0 20px 50px rgba(0,0,0,.45);scrollbar-width:none}div[role="radiogroup"]::-webkit-scrollbar{display:none}div[role="radiogroup"] label{justify-content:center;border-radius:18px;padding:.5rem .68rem!important;margin:0!important;min-height:48px;min-width:max-content;background:transparent;white-space:nowrap}div[role="radiogroup"] label:has(input:checked){background:linear-gradient(135deg,rgba(243,186,47,.28),rgba(255,255,255,.08));color:#fff}div[role="radiogroup"] p{font-size:.76rem!important;font-weight:800}.donut{width:150px;height:150px;border-radius:50%;background:conic-gradient(var(--gold) 0 58%, var(--green) 58% 82%, #5561ff 82%);margin:auto;display:grid;place-items:center}.donut:after{content:"";width:92px;height:92px;border-radius:50%;background:#11141b}.chat-bubble{border-radius:22px;padding:.85rem;margin:.55rem 0;max-width:92%;border:1px solid var(--line)}.bot{background:rgba(243,186,47,.12)}.user{background:rgba(255,255,255,.07);margin-left:auto}.mission li{margin:.45rem 0}.notice{font-size:.73rem;color:var(--muted)}@keyframes shimmer{to{background-position:-220% 0}}@keyframes loadbar{from{width:0}}.float-in{animation:floatIn .5s cubic-bezier(.2,.8,.2,1) both}@keyframes floatIn{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}@media(max-width:390px){div[role="radiogroup"] label{min-height:46px;padding:.45rem .55rem!important}.block-container{padding-left:.75rem!important;padding-right:.75rem!important}.value{font-size:1.9rem}.quick-grid,.metric-grid{gap:.45rem}.mini-stat,.metric-grid span{padding:.62rem .5rem}}
+:root{--bg:#0B0E11;--surface:#181A20;--surface-2:#1E2329;--gold:#F3BA2F;--green:#02C076;--red:#F6465D;--text:#fff;--muted:#A7B0BE;--line:rgba(255,255,255,.08);--shadow:0 16px 45px rgba(0,0,0,.28)}
+.stApp{background:radial-gradient(circle at 10% -8%,rgba(243,186,47,.16),transparent 30%),linear-gradient(180deg,var(--bg) 0%,#080A0D 100%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Inter",sans-serif}.block-container{max-width:430px!important;padding:calc(env(safe-area-inset-top) + 7.2rem) .95rem calc(env(safe-area-inset-bottom) + 1.8rem)!important;overflow-x:hidden}#MainMenu,footer,header,[data-testid="stToolbar"],[data-testid="stDecoration"],.stDeployButton{display:none!important}.stApp *{box-sizing:border-box}.app-shell{position:fixed;z-index:1000;top:0;left:50%;transform:translateX(-50%);width:min(430px,100vw);padding:calc(env(safe-area-inset-top) + .45rem) .65rem .45rem;background:linear-gradient(180deg,rgba(11,14,17,.98),rgba(11,14,17,.86));backdrop-filter:blur(24px);border-bottom:1px solid var(--line)}.topbar{height:44px;display:flex;align-items:center;justify-content:space-between;gap:.7rem}.brand{font-size:1.05rem;font-weight:900;letter-spacing:-.04em}.nav-icons{display:flex;gap:.45rem}.icon-btn{width:38px;height:38px;border:1px solid var(--line);border-radius:15px;background:rgba(255,255,255,.055);display:grid;place-items:center}.tabs{height:52px;display:flex;gap:.32rem;align-items:center;overflow-x:auto;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}.tabs span{flex:0 0 auto;border:1px solid transparent;border-radius:999px;padding:.52rem .75rem;color:var(--muted);font-size:.78rem;font-weight:800}.tabs span.active{background:rgba(243,186,47,.16);border-color:rgba(243,186,47,.28);color:#fff}.section-title{font-size:1.25rem;letter-spacing:-.045em;margin:.2rem 0 .75rem}.hero h1{font-size:1.45rem;letter-spacing:-.055em;margin:.15rem 0}.muted,.hero p,.coin-title p,.mini-stat span{color:var(--muted);font-size:.76rem;margin:.12rem 0}.portfolio-card,.coin-card,.glass-card,.ai-card,.empty-card,.news-card{border-radius:22px;background:linear-gradient(145deg,rgba(255,255,255,.065),rgba(255,255,255,.025)),var(--surface);border:1px solid var(--line);box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.06);padding:1rem;margin:.78rem 0;overflow:hidden;animation:fadeSlide .34s ease both}.portfolio-card{background:radial-gradient(circle at 12% 0%,rgba(243,186,47,.25),transparent 42%),linear-gradient(145deg,#22262E,#11141A)}.empty-card{text-align:left;background:linear-gradient(145deg,rgba(243,186,47,.09),rgba(255,255,255,.025)),var(--surface)}.empty-icon{width:52px;height:52px;border-radius:18px;background:rgba(243,186,47,.15);display:grid;place-items:center;color:var(--gold);font-size:1.35rem;margin-bottom:.7rem}.eyebrow,.pill{display:inline-flex;align-items:center;gap:.35rem;color:#161102;background:linear-gradient(135deg,var(--gold),#FFE29A);font-weight:900;font-size:.66rem;border-radius:999px;padding:.28rem .55rem}.pill{background:rgba(255,255,255,.06);color:#EAECEF;border:1px solid var(--line)}.value{font-size:2.2rem;font-weight:950;letter-spacing:-.075em;margin:.55rem 0 .25rem}.quick-grid,.metric-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.55rem}.mini-stat,.metric-grid span{background:rgba(0,0,0,.20);border:1px solid var(--line);border-radius:17px;padding:.68rem .58rem;min-width:0}.mini-stat b,.metric-grid b{display:block;font-size:.84rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.section-head,.coin-row,.coin-title,.metric-line,.progress-row{display:flex;align-items:center;justify-content:space-between;gap:.72rem}.positive,.risk-low{color:var(--green)!important}.negative,.risk-high{color:var(--red)!important}.risk-med{color:var(--gold)!important}.sparkline{width:100%;height:70px;margin:.75rem 0}.coin-card{transition:transform .24s ease,border-color .24s ease}.coin-card:active,.stButton>button:active{transform:scale(.985)}.coin-logo,.coin-fallback{width:42px;height:42px;border-radius:50%;box-shadow:0 0 0 1px rgba(255,255,255,.12)}.coin-fallback{display:grid;place-items:center;background:linear-gradient(135deg,var(--gold),#8b681d);color:#111;font-weight:900}.coin-title{justify-content:flex-start}.coin-title h3{font-size:1rem;letter-spacing:-.04em;margin:0}.price-stack{text-align:right;display:flex;align-items:flex-end;flex-direction:column;gap:.15rem}.price-stack strong{font-size:.98rem}.price-stack span{font-size:.7rem}.fav{width:30px;height:30px;border-radius:11px;color:var(--gold);background:rgba(255,255,255,.06);border:1px solid var(--line)}.badge-row,.suggestions{display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.7rem}.badge-row em,.suggestions span{font-style:normal;font-weight:800;font-size:.68rem;padding:.34rem .55rem;border-radius:999px;border:1px solid rgba(243,186,47,.25);background:rgba(243,186,47,.12);color:#FFE29A}.score-badge{min-width:62px;height:46px;border-radius:16px;display:flex;align-items:center;justify-content:center;gap:.1rem;flex-direction:column;background:linear-gradient(135deg,var(--gold),#74551a);color:#0B0E11}.progress,.volatility{height:8px;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden;margin:.35rem 0 .7rem}.progress i,.volatility i{display:block;height:100%;background:linear-gradient(90deg,#8A6419,var(--gold),#FFF2BF);border-radius:999px;animation:loadbar .8s ease}.stButton>button,.stDownloadButton>button{border-radius:17px!important;min-height:46px!important;border:1px solid rgba(243,186,47,.35)!important;background:linear-gradient(135deg,rgba(243,186,47,.24),rgba(255,255,255,.06))!important;color:#fff!important}.stTextInput input,.stNumberInput input,.stTextArea textarea,.stSelectbox div[data-baseweb="select"]{border-radius:16px!important;background:rgba(255,255,255,.06)!important;border-color:var(--line)!important;color:#fff!important;min-height:46px}.stExpander{border:1px solid var(--line)!important;border-radius:22px!important;background:rgba(24,26,32,.72)!important;overflow:hidden}div[role="radiogroup"]{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 3.72rem);transform:translateX(-50%);z-index:1001;width:min(410px,calc(100vw - 20px));height:52px;display:flex!important;gap:.32rem;overflow-x:auto;background:transparent;padding:0;scrollbar-width:none}div[role="radiogroup"]::-webkit-scrollbar{display:none}div[role="radiogroup"] label{justify-content:center;border-radius:999px;padding:.5rem .72rem!important;margin:0!important;min-height:40px;min-width:max-content;background:transparent;white-space:nowrap}div[role="radiogroup"] label:has(input:checked){background:rgba(243,186,47,.16);border:1px solid rgba(243,186,47,.28)}div[role="radiogroup"] p{font-size:.78rem!important;font-weight:850}.donut{width:152px;height:152px;border-radius:50%;background:conic-gradient(var(--gold) 0 var(--a,58%), var(--green) var(--a,58%) var(--b,82%), #5561ff var(--b,82%));margin:.5rem auto;display:grid;place-items:center}.donut:after{content:"";width:92px;height:92px;border-radius:50%;background:#11141b}.chat-bubble{white-space:pre-line;border-radius:22px;padding:.88rem;margin:.58rem 0;max-width:92%;border:1px solid var(--line);line-height:1.45}.bot{background:rgba(243,186,47,.12)}.user{background:rgba(255,255,255,.07);margin-left:auto}.avatar{width:34px;height:34px;border-radius:14px;background:var(--gold);color:#111;display:inline-grid;place-items:center;font-weight:900;margin-right:.45rem}.news-img{height:118px;border-radius:18px;background:linear-gradient(135deg,rgba(243,186,47,.22),rgba(2,192,118,.10)),var(--surface-2);background-size:cover;background-position:center;margin-bottom:.7rem}.status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px rgba(2,192,118,.12)}@keyframes loadbar{from{width:0}}@keyframes fadeSlide{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}@media(max-width:390px){.block-container{padding-left:.75rem!important;padding-right:.75rem!important}.value{font-size:1.9rem}.quick-grid,.metric-grid{gap:.42rem}.mini-stat,.metric-grid span{padding:.58rem .48rem}}
 </style>
 """,
     unsafe_allow_html=True,
 )
 
 client = CoinGeckoClient()
-default_state = {"portfolio": empty_portfolio(), "watchlist": ["bitcoin", "ethereum", "solana"], "screen": "🏠 Accueil", "currency": "USD", "theme": "Premium Dark", "refresh_interval": "90 secondes"}
+default_state = {"portfolio": empty_portfolio(), "watchlist": ["bitcoin", "ethereum", "solana"], "screen": "Accueil", "currency": "USD", "theme": "Premium Dark", "refresh_interval": "90 secondes"}
 for key, value in default_state.items():
     if key not in st.session_state:
         st.session_state[key] = value
@@ -244,28 +250,38 @@ fav_ids = set(st.session_state.portfolio.loc[st.session_state.portfolio["favorit
 best_row = portfolio.sort_values("pnl_pct", ascending=False).head(1) if not portfolio.empty else pd.DataFrame()
 worst_row = portfolio.sort_values("pnl_pct", ascending=True).head(1) if not portfolio.empty else pd.DataFrame()
 
-st.markdown("<div class='topbar'><div class='hello'><p>Assistant crypto premium</p><h1>Trader</h1></div><div class='top-actions'><span class='icon-btn'>↻</span><span class='icon-btn'>🔔</span></div></div>", unsafe_allow_html=True)
-sections = ["🏠 Accueil", "📈 Marchés", "💼 Portefeuille", "🤖 Bots", "📰 Actualités", "🧮 Calculateur", "⭐ Opportunités", "💬 Trader IA"]
+st.markdown("<div class='app-shell'><div class='topbar'><span class='icon-btn'>☰</span><div class='brand'>Trader</div><div class='nav-icons'><span class='icon-btn'>🔔</span><span class='icon-btn'>👤</span></div></div><div class='tabs' aria-hidden='true'><span>Accueil</span><span>Marchés</span><span>Wallet</span><span>Bots</span><span>News</span><span>IA</span></div></div>", unsafe_allow_html=True)
+sections = ["Accueil", "Marchés", "Wallet", "Bots", "News", "IA", "Opportunités"]
 screen = st.radio("Navigation", sections, horizontal=True, label_visibility="collapsed", key="screen")
 fng_value, fng_label = fear_greed()
 dominance = btc_dominance(market_objects)
 segments = segment_allocation(total_value)
+fng_display = f"{fng_value}/100" if fng_value is not None else "Indisponible"
 
-if screen == "🏠 Accueil":
+if screen == "Accueil":
+    st.markdown("<div class='hero'><p>Bonjour Mouad 👋</p><h1>Votre cockpit crypto</h1></div>", unsafe_allow_html=True)
     top_gain = best_row.iloc[0] if not best_row.empty else None
     top_loss = worst_row.iloc[0] if not worst_row.empty else None
-    st.markdown(f"""
-    <section class='portfolio-card float-in'><span class='eyebrow'>TABLEAU DE BORD</span><div class='value'>{format_money(total_value)}</div>
-      <div class='quick-grid'><div class='mini-stat'><span>PnL du jour</span><b class='{pct_class(daily_pnl)}'>{format_money(daily_pnl)}<br>{format_pct(daily_pnl_pct)}</b></div><div class='mini-stat'><span>PnL global</span><b class='{pct_class(total_pnl)}'>{format_money(total_pnl)}<br>{format_pct(total_pnl_pct)}</b></div><div class='mini-stat'><span>BTC dominance</span><b>{dominance:.1f}%</b></div></div>
-      {sparkline_svg([sum((market_lookup.get(str(r['coin_id'])).sparkline[i] if market_lookup.get(str(r['coin_id'])) and len(market_lookup[str(r['coin_id'])].sparkline)>i else 0)*float(r['quantity']) for _, r in portfolio.iterrows()) for i in range(0, 42)] if not portfolio.empty else [coin.current_price for coin in market_objects[:8]])}
-    </section>""", unsafe_allow_html=True)
-    st.markdown("<section class='glass-card mission'><h2>Mission du jour</h2><ul><li>✓ Vérifier portefeuille</li><li>✓ Surveiller SOL</li><li>✓ Ajouter USDT si nécessaire</li><li>✓ Vérifier Spot Grid</li><li>✓ Lire les news importantes</li></ul></section>", unsafe_allow_html=True)
+    if portfolio.empty and not BinanceReadOnlyClient().configured:
+        st.markdown("""<section class='empty-card'><div class='empty-icon'>⌁</div><h2>Connectez Binance pour afficher votre portefeuille.</h2><p class='muted'>Vos soldes, votre allocation et votre PnL apparaîtront ici dès qu'une connexion lecture seule sera disponible.</p></section>""", unsafe_allow_html=True)
+        if st.button("Connecter Binance", use_container_width=True):
+            st.toast("Ajoutez BINANCE_API_KEY et BINANCE_API_SECRET côté serveur pour activer la synchronisation.")
+    else:
+        st.markdown(f"""
+        <section class='portfolio-card float-in'><span class='eyebrow'>TABLEAU DE BORD</span><div class='value'>{format_money(total_value)}</div>
+          <div class='quick-grid'><div class='mini-stat'><span>Variation du jour</span><b class='{pct_class(daily_pnl)}'>{format_money(daily_pnl)}<br>{format_pct(daily_pnl_pct)}</b></div><div class='mini-stat'><span>PnL global</span><b class='{pct_class(total_pnl)}'>{format_money(total_pnl)}<br>{format_pct(total_pnl_pct)}</b></div><div class='mini-stat'><span>BTC dominance</span><b>{dominance:.1f}%</b></div></div>
+          {sparkline_svg([sum((market_lookup.get(str(r['coin_id'])).sparkline[i] if market_lookup.get(str(r['coin_id'])) and len(market_lookup[str(r['coin_id'])].sparkline)>i else 0)*float(r['quantity']) for _, r in portfolio.iterrows()) for i in range(0, 42)] if not portfolio.empty else [coin.current_price for coin in market_objects[:8]])}
+        </section>""", unsafe_allow_html=True)
+    st.markdown("<section class='glass-card mission'><h2>Mission du jour</h2><ul><li>✓ Vérifier la valeur totale</li><li>✓ Lire les alertes de marché</li><li>✓ Identifier une opportunité à surveiller</li></ul></section>", unsafe_allow_html=True)
     gain_txt = f"{top_gain['symbol']} {format_money(float(top_gain['pnl']))}" if top_gain is not None else "Ajoute une position"
     loss_txt = f"{top_loss['symbol']} {format_money(float(top_loss['pnl']))}" if top_loss is not None else "Ajoute une position"
-    st.markdown(f"<section class='glass-card'><div class='quick-grid'><div class='mini-stat'><span>Spot</span><b>{format_money(segments['Spot'])}</b></div><div class='mini-stat'><span>Earn</span><b>{format_money(segments['Earn'])}</b></div><div class='mini-stat'><span>Bots</span><b>{format_money(segments['Bots'])}</b></div></div><div class='metric-grid'><span>Top gain <b class='positive'>{gain_txt}</b></span><span>Top perte <b class='negative'>{loss_txt}</b></span><span>Fear & Greed <b>{fng_value}/100<br>{fng_label}</b></span></div></section>", unsafe_allow_html=True)
+    if portfolio.empty:
+        st.markdown(f"<section class='glass-card'><div class='metric-grid'><span>Fear & Greed <b>{fng_display}<br>{fng_label}</b></span><span>BTC Dominance <b>{dominance:.1f}%</b></span><span>Top Movers <b>{len(market_objects)} suivis</b></span></div></section>", unsafe_allow_html=True)
+    else:
+        st.markdown(f"<section class='glass-card'><div class='quick-grid'><div class='mini-stat'><span>Spot</span><b>{format_money(total_value)}</b></div><div class='mini-stat'><span>Actifs</span><b>{len(portfolio)}</b></div><div class='mini-stat'><span>PnL</span><b class='{pct_class(total_pnl)}'>{format_pct(total_pnl_pct)}</b></div></div><div class='metric-grid'><span>Top gain <b class='positive'>{gain_txt}</b></span><span>Top perte <b class='negative'>{loss_txt}</b></span><span>Fear & Greed <b>{fng_display}<br>{fng_label}</b></span></div></section>", unsafe_allow_html=True)
 
-elif screen == "📈 Marchés":
-    st.markdown(f"<section class='glass-card'><div class='section-head'><h2>Marchés</h2><span class='muted'>Fear & Greed {fng_value}/100 · BTC {dominance:.1f}%</span></div></section>", unsafe_allow_html=True)
+elif screen == "Marchés":
+    st.markdown(f"<section class='glass-card'><div class='section-head'><h2>Marchés</h2><span class='muted'>Fear & Greed {fng_display} · BTC {dominance:.1f}%</span></div></section>", unsafe_allow_html=True)
     query = st.text_input("Recherche crypto", placeholder="BTC, ETH, SOL…")
     filtered = [c for c in market_objects if not query or query.lower() in c.name.lower() or query.upper() in c.symbol]
     st.markdown("<h3>Meilleures hausses</h3>", unsafe_allow_html=True)
@@ -275,11 +291,15 @@ elif screen == "📈 Marchés":
     st.markdown("<h3>Liste de suivi</h3>", unsafe_allow_html=True)
     for coin in [c for c in filtered if c.coin_id in st.session_state.watchlist][:5]: render_market_card(coin, favorite=True)
 
-elif screen == "💼 Portefeuille":
-    st.markdown(f"<section class='portfolio-card'><span class='eyebrow'>PORTEFEUILLE</span><div class='value'>{format_money(total_value)}</div><div class='donut'></div><div class='quick-grid'><div class='mini-stat'><span>Spot</span><b>{format_money(segments['Spot'])}</b></div><div class='mini-stat'><span>Earn</span><b>{format_money(segments['Earn'])}</b></div><div class='mini-stat'><span>Bots</span><b>{format_money(segments['Bots'])}</b></div></div></section>", unsafe_allow_html=True)
+elif screen == "Wallet":
     binance = BinanceReadOnlyClient()
+    if portfolio.empty:
+        st.markdown("<section class='empty-card'><div class='empty-icon'>◒</div><h2>Votre portefeuille est prêt.</h2><p class='muted'>Connectez Binance ou ajoutez une position pour afficher la valeur totale, l'allocation, le donut et la liste des actifs.</p></section>", unsafe_allow_html=True)
+    else:
+        st.markdown(f"<section class='portfolio-card'><span class='eyebrow'>PORTEFEUILLE</span><div class='value'>{format_money(total_value)}</div><div class='donut'></div><div class='quick-grid'><div class='mini-stat'><span>Spot</span><b>{format_money(total_value)}</b></div><div class='mini-stat'><span>Allocation</span><b>{len(portfolio)} actifs</b></div><div class='mini-stat'><span>PnL</span><b class='{pct_class(total_pnl)}'>{format_pct(total_pnl_pct)}</b></div></div></section>", unsafe_allow_html=True)
     if not binance.configured:
-        st.info("Connexion Binance non configurée.")
+        st.markdown("<section class='empty-card'><div class='section-head'><h3>Binance</h3><span class='pill'>Hors ligne</span></div><p class='muted'>API absente. Activez une clé lecture seule pour synchroniser automatiquement vos soldes Spot.</p></section>", unsafe_allow_html=True)
+        st.button("Connecter Binance", use_container_width=True)
     else:
         try:
             assets = binance.spot_assets()
@@ -300,21 +320,24 @@ elif screen == "💼 Portefeuille":
                 st.session_state.portfolio = normalize_portfolio(pd.concat([st.session_state.portfolio[st.session_state.portfolio["coin_id"] != coin_id], next_row], ignore_index=True)); st.rerun()
     for _, row in portfolio.iterrows(): render_holding_card(row, market_lookup.get(str(row['coin_id'])))
 
-elif screen == "🤖 Bots":
-    st.markdown("<section class='glass-card'><h2>Bots</h2><p class='muted'>Suivi éducatif des stratégies automatisées, sans exécution d’ordre.</p></section>", unsafe_allow_html=True)
-    for name, perf, capital in [("Bots Spot", 8.4, 1250), ("Bots contrats", -2.1, 0), ("Copie de stratégies", 4.6, 500)]:
-        st.markdown(f"<article class='coin-card'><div class='metric-line'><h3>{name}</h3><b class='{pct_class(perf)}'>{format_pct(perf)}</b></div><div class='metric-grid'><span>Rentabilité <b class='{pct_class(perf)}'>{format_pct(perf)}</b></span><span>Capital <b>{format_money(capital)}</b></span><span>Analyse IA <b>{'Prudent' if perf < 0 else 'Stable'}</b></span></div></article>", unsafe_allow_html=True)
+elif screen == "Bots":
+    st.markdown("<section class='empty-card'><div class='empty-icon'>⌘</div><h2>Bots</h2><p class='muted'>Aucun bot connecté. Les performances réelles s'afficheront uniquement après connexion d'une source de données.</p></section>", unsafe_allow_html=True)
 
-elif screen == "📰 Actualités":
+elif screen == "News":
     @st.cache_data(ttl=300, show_spinner=False)
     def load_news() -> list[dict[str, object]]: return client.fetch_news(per_page=10)
     try: articles = load_news() or demo_news()
     except Exception: articles = demo_news()
+    if not articles:
+        st.markdown("<section class='empty-card'><div class='empty-icon'>▧</div><h2>Feed indisponible</h2><p class='muted'>Aucune actualité vérifiée n'est disponible pour le moment. Réessayez après la prochaine synchronisation.</p></section>", unsafe_allow_html=True)
     for article in articles[:10]:
-        tags = article.get('tags') or [tag for tag in ['BTC','ETH','SOL','DOGE','SUI'] if tag.lower() in str(article).lower()] or ['BTC']
-        st.markdown(f"<article class='glass-card news-card'><span class='eyebrow'>{html.escape(str(article.get('source') or article.get('source_name') or 'Mode démonstration'))}</span><h3>{html.escape(str(article.get('title') or 'Actualité crypto'))}</h3><p class='muted'>{html.escape(str(article.get('date') or article.get('created_at') or 'Aujourd’hui'))}</p><p><b>Résumé IA :</b> {html.escape(one_sentence_summary(article))}</p><div class='badge-row'>{''.join(f'<em>{html.escape(str(t))}</em>' for t in tags)}</div></article>", unsafe_allow_html=True)
+        tags = article.get('tags') or [tag for tag in ['BTC','ETH','SOL','DOGE','SUI'] if tag.lower() in str(article).lower()] or ['Crypto']
+        image = html.escape(str(article.get('thumb_2x') or article.get('image') or article.get('urlToImage') or ''))
+        image_style = f" style=\"background-image:url('{image}')\"" if image else ""
+        source = html.escape(str(article.get('source') or article.get('source_name') or 'Source crypto'))
+        st.markdown(f"<article class='news-card'><div class='news-img'{image_style}></div><span class='eyebrow'>{source}</span><h3>{html.escape(str(article.get('title') or 'Actualité crypto'))}</h3><p class='muted'>{html.escape(str(article.get('date') or article.get('created_at') or 'Maintenant'))}</p><p>{html.escape(one_sentence_summary(article))}</p><div class='badge-row'>{''.join(f'<em>{html.escape(str(t))}</em>' for t in tags)}</div></article>", unsafe_allow_html=True)
 
-elif screen == "🧮 Calculateur":
+elif screen == "Calculateur":
     st.markdown("<section class='glass-card'><h2>Calculateur</h2><p class='muted'>Résultat instantané.</p></section>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     capital = c1.number_input("Capital", min_value=0.0, value=1000.0)
@@ -329,14 +352,15 @@ elif screen == "🧮 Calculateur":
     risk = max(avg - stop, 0); reward = max(sortie - avg, 0)
     st.markdown(f"<section class='portfolio-card'><div class='metric-grid'><span>Prix moyen <b>{format_money(avg)}</b></span><span>DCA <b>{format_money(dca)}</b></span><span>ROI <b class='{pct_class(roi)}'>{format_pct(roi)}</b></span><span>Ratio risque/rendement <b>{(reward/risk if risk else 0):.2f}</b></span><span>Taille position <b>{qty:.6f}</b></span><span>Seuil de protection <b>{format_money(stop)}</b></span></div></section>", unsafe_allow_html=True)
 
-elif screen == "⭐ Opportunités":
+elif screen == "Opportunités":
     st.markdown("<section class='glass-card'><h2>Opportunités</h2><p class='notice'>Analyse indicative uniquement.</p></section>", unsafe_allow_html=True)
     for coin in sorted(market_objects, key=lambda c: recommendation_for(c).opportunity_score, reverse=True)[:12]:
         rec = recommendation_for(coin); conf = confidence_for(coin)
         st.markdown(f"<article class='coin-card'><div class='coin-row'><div class='coin-title'>{coin_logo(coin, coin.symbol)}<div><h3>{coin.name}</h3><p>{coin.symbol}</p></div></div>{score_badge(rec.opportunity_score)}</div><div class='metric-grid'><span>Signal <b>{signal_label(rec.opportunity_score)}</b></span><span>Confiance <b>{conf}%</b></span><span>Prix <b>{format_money(coin.current_price)}</b></span></div><p class='muted'>{html.escape(rec.rationale)}</p></article>", unsafe_allow_html=True)
 
 else:
-    if "messages" not in st.session_state: st.session_state.messages = [{"role":"bot","text":"Bonjour, je suis Trader. Je peux analyser ton portefeuille et les opportunités crypto."}]
+    if "messages" not in st.session_state:
+        st.session_state.messages = [{"role": "bot", "text": "Bonjour Mouad 👋\n\nJe suis Trader.\n\nJe peux analyser :\n• ton portefeuille\n• le marché\n• une crypto\n• les news\n• les opportunités."}]
     for msg in st.session_state.messages:
         st.markdown(f"<div class='chat-bubble {'bot' if msg['role']=='bot' else 'user'}'>{html.escape(msg['text'])}</div>", unsafe_allow_html=True)
     prompt = st.text_input("Message", placeholder="Demandez à Trader d’analyser votre portefeuille...")

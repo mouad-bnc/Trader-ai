@@ -150,10 +150,22 @@ st.markdown(
 market_service = MarketService()
 portfolio_service = PortfolioService()
 news_service = NewsService()
-default_state = {"portfolio": portfolio_service.empty(), "watchlist": ["bitcoin", "ethereum", "solana"], "screen": "Accueil", "currency": "USD", "theme": "Premium Dark", "refresh_interval": "90 secondes"}
+default_state = {"portfolio": portfolio_service.empty(), "last_portfolio_sync": None, "binance_connection_status": "not_configured", "binance_connection_message": "Connexion Binance non configurée", "watchlist": ["bitcoin", "ethereum", "solana"], "screen": "Accueil", "currency": "USD", "theme": "Premium Dark", "refresh_interval": "90 secondes"}
 for key, value in default_state.items():
     if key not in st.session_state:
         st.session_state[key] = value
+
+# Synchronisation automatique du portefeuille Binance en lecture seule.
+previous_connection_status = st.session_state.binance_connection_status
+sync_result = portfolio_service.sync_binance_portfolio()
+st.session_state.binance_connection_status = sync_result.connection_status
+st.session_state.binance_connection_message = sync_result.message
+if sync_result.synced_at:
+    st.session_state.last_portfolio_sync = sync_result.synced_at
+if sync_result.connection_status == "connected":
+    st.session_state.portfolio = sync_result.portfolio
+elif sync_result.connection_status == "not_configured" and previous_connection_status != "imported_csv":
+    st.session_state.portfolio = portfolio_service.empty()
 
 with st.sidebar:
     st.header("Studio de données")
@@ -163,6 +175,8 @@ with st.sidebar:
             imported = portfolio_service.import_csv(uploaded)
             if st.button("Utiliser le portefeuille importé", type="primary", use_container_width=True):
                 st.session_state.portfolio = imported
+                st.session_state.binance_connection_status = "imported_csv"
+                st.session_state.binance_connection_message = "Portefeuille importé depuis un CSV"
                 st.success(f"Importé {len(imported)} actifs.")
         except Exception as exc:
             st.warning(f"Import impossible : {html.escape(str(exc))}")
@@ -232,6 +246,8 @@ SCREEN_RENDERERS = {
         pct_class=pct_class,
         sparkline_svg=sparkline_svg,
         binance_configured=portfolio_service.binance_configured,
+        connection_status=st.session_state.binance_connection_status,
+        connection_message=st.session_state.binance_connection_message,
     ),
     "Marchés": lambda: render_markets(
         market_objects=market_objects,
@@ -249,6 +265,9 @@ SCREEN_RENDERERS = {
         pct_class=pct_class,
         render_holding_card=render_holding_card,
         portfolio_service=portfolio_service,
+        connection_status=st.session_state.binance_connection_status,
+        connection_message=st.session_state.binance_connection_message,
+        last_sync=st.session_state.last_portfolio_sync,
     ),
     "Bots": render_bots,
     "Actualités": lambda: render_news(
@@ -258,12 +277,13 @@ SCREEN_RENDERERS = {
     "Calculateur": lambda: render_calculator(pct_class=pct_class),
     "Opportunités": lambda: render_opportunities(
         market_objects=market_objects,
+        portfolio=portfolio,
         confidence_for=confidence_for,
         coin_logo=coin_logo,
         score_badge=score_badge,
         signal_label=signal_label,
     ),
-    "Trader IA": lambda: render_trader_ai(market_objects=market_objects),
+    "Trader IA": lambda: render_trader_ai(market_objects=market_objects, portfolio=portfolio),
 }
 
 SCREEN_RENDERERS[screen]()

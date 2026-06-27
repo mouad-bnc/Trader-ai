@@ -5,7 +5,7 @@ import streamlit as st
 from components.ui import render_section_head_card
 
 
-def render_markets(*, market_objects, fng_display: str, dominance: float, render_market_card) -> None:
+def render_markets(*, market_objects, fng_display: str, dominance: float, render_market_card, **_ignored_kwargs) -> None:
     dominance_value = float(dominance or 0)
     market_objects = market_objects or []
     render_section_head_card("Marchés", f"Fear & Greed {fng_display} · BTC {dominance_value:.1f}%")

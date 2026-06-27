@@ -7,7 +7,7 @@ import streamlit as st
 from portfolio_analytics import recommendation_for
 
 
-def render_trader_ai(*, market_objects, portfolio) -> None:
+def render_trader_ai(*, market_objects, portfolio, **_ignored_kwargs) -> None:
     if "messages" not in st.session_state:
         st.session_state.messages = [{"role": "bot", "text": "Bonjour Mouad 👋\n\nJe suis Trader.\n\nJe peux analyser :\n• ton portefeuille\n• le marché\n• une crypto\n• les news\n• les opportunités."}]
     for msg in st.session_state.messages:

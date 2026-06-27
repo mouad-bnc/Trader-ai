@@ -6,7 +6,7 @@ from components.ui import render_section_card
 from portfolio_analytics import format_money, format_pct
 
 
-def render_calculator(*, pct_class) -> None:
+def render_calculator(*, pct_class, **_ignored_kwargs) -> None:
     render_section_card("Calculateur", "Résultat instantané.")
     c1, c2 = st.columns(2)
     capital = c1.number_input("Capital", min_value=0.0, value=1000.0)

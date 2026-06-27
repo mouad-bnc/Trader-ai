@@ -8,7 +8,7 @@ from components.ui import render_empty_card, render_section_card
 from portfolio_analytics import format_money, recommendation_for
 
 
-def render_opportunities(*, market_objects, portfolio, confidence_for, coin_logo, score_badge, signal_label) -> None:
+def render_opportunities(*, market_objects, portfolio, confidence_for, coin_logo, score_badge, signal_label, **_ignored_kwargs) -> None:
     portfolio_count = len(portfolio) if portfolio is not None else 0
     render_section_card("Opportunités", f"Analyse indicative basée sur le marché et {portfolio_count} actif(s) synchronisé(s).", notice=True)
     if not market_objects:

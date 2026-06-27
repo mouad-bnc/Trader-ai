@@ -124,9 +124,28 @@ class PortfolioService:
 
 
     def sync_portfolio(self) -> BinanceSyncResult:
-        """Alias de compatibilité pour les anciens appels de synchronisation Binance."""
+        """Wrapper public sûr pour synchroniser le portefeuille Binance.
 
-        return self.sync_binance_portfolio()
+        L'ancien écran d'accueil appelle cette méthode au démarrage. Elle ne
+        doit donc jamais propager d'exception : sans configuration Binance ou
+        en cas d'erreur inattendue, elle renvoie un résultat propre affichable.
+        """
+
+        try:
+            result = self.sync_binance_portfolio()
+        except Exception:
+            return self._sync_error("error", "Synchronisation Binance impossible. Vérifie la configuration Binance.")
+
+        if result.connection_status == "not_configured":
+            return result
+        if result.connection_status == "connected":
+            return result
+        return BinanceSyncResult(
+            portfolio=result.portfolio,
+            synced_at=result.synced_at,
+            connection_status="error",
+            message=result.message or "Synchronisation Binance impossible.",
+        )
 
     def _sync_error(self, status: str, message: str) -> BinanceSyncResult:
         return BinanceSyncResult(portfolio=self.empty(), synced_at=None, connection_status=status, message=message)
@@ -178,9 +197,9 @@ def sync_binance_portfolio(binance_client: BinanceReadOnlyClient | None = None) 
 
 
 def sync_portfolio(binance_client: BinanceReadOnlyClient | None = None) -> BinanceSyncResult:
-    """Alias de compatibilité pour les anciens appels de synchronisation Binance."""
+    """Wrapper public sûr pour les anciens appels de synchronisation Binance."""
 
-    return sync_binance_portfolio(binance_client)
+    return PortfolioService(binance_client).sync_portfolio()
 
 
 __all__ = ["BinanceSyncResult", "PortfolioData", "PortfolioService", "sync_binance_portfolio", "sync_portfolio"]

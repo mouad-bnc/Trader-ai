@@ -37,9 +37,9 @@ def render_home(
     connection_message: str,
     **_ignored_kwargs,
 ) -> None:
-    st.markdown("<div class='hero'><p>Bonjour Mouad 👋</p><h1>Votre cockpit crypto</h1></div>", unsafe_allow_html=True)
+    dominance = float(dominance or 0)
     market_objects = market_objects or []
-    dominance_value = _safe_number(dominance, 0.0)
+    st.markdown("<div class='hero'><p>Bonjour Mouad 👋</p><h1>Votre cockpit crypto</h1></div>", unsafe_allow_html=True)
     top_gain = best_row.iloc[0] if best_row is not None and not best_row.empty else None
     top_loss = worst_row.iloc[0] if worst_row is not None and not worst_row.empty else None
     if portfolio.empty and not binance_configured:
@@ -51,14 +51,14 @@ def render_home(
             st.warning(connection_message)
         st.markdown(f"""
         <section class='portfolio-card float-in'><span class='eyebrow'>TABLEAU DE BORD</span><div class='value'>{format_money(total_value)}</div>
-          <div class='quick-grid'><div class='mini-stat'><span>Variation du jour</span><b class='{pct_class(daily_pnl)}'>{format_money(daily_pnl)}<br>{format_pct(daily_pnl_pct)}</b></div><div class='mini-stat'><span>PnL global</span><b class='{pct_class(total_pnl)}'>{format_money(total_pnl)}<br>{format_pct(total_pnl_pct)}</b></div><div class='mini-stat'><span>BTC dominance</span><b>{dominance_value:.1f}%</b></div></div>
+          <div class='quick-grid'><div class='mini-stat'><span>Variation du jour</span><b class='{pct_class(daily_pnl)}'>{format_money(daily_pnl)}<br>{format_pct(daily_pnl_pct)}</b></div><div class='mini-stat'><span>PnL global</span><b class='{pct_class(total_pnl)}'>{format_money(total_pnl)}<br>{format_pct(total_pnl_pct)}</b></div><div class='mini-stat'><span>BTC dominance</span><b>{dominance:.1f}%</b></div></div>
           {sparkline_svg([sum((market_lookup.get(str(r['coin_id'])).sparkline[i] if market_lookup.get(str(r['coin_id'])) and len(market_lookup[str(r['coin_id'])].sparkline)>i else 0)*float(r['quantity']) for _, r in portfolio.iterrows()) for i in range(0, 42)] if not portfolio.empty else [coin.current_price for coin in market_objects[:8]])}
         </section>""", unsafe_allow_html=True)
     st.markdown("<section class='glass-card mission'><h2>Mission du jour</h2><ul><li>✓ Vérifier la valeur totale</li><li>✓ Lire les alertes de marché</li><li>✓ Identifier une opportunité à surveiller</li></ul></section>", unsafe_allow_html=True)
     gain_txt = f"{top_gain['symbol']} {format_money(float(top_gain['pnl']))}" if top_gain is not None else "Ajoute une position"
     loss_txt = f"{top_loss['symbol']} {format_money(float(top_loss['pnl']))}" if top_loss is not None else "Ajoute une position"
     if portfolio.empty:
-        st.markdown(f"<section class='glass-card'><div class='metric-grid'><span>Fear & Greed <b>{fng_display}<br>{fng_label}</b></span><span>BTC Dominance <b>{dominance_value:.1f}%</b></span><span>Top Movers <b>{len(market_objects)} suivis</b></span></div></section>", unsafe_allow_html=True)
+        st.markdown(f"<section class='glass-card'><div class='metric-grid'><span>Fear & Greed <b>{fng_display}<br>{fng_label}</b></span><span>BTC Dominance <b>{dominance:.1f}%</b></span><span>Top Movers <b>{len(market_objects)} suivis</b></span></div></section>", unsafe_allow_html=True)
     else:
         st.markdown(f"<section class='glass-card'><div class='quick-grid'><div class='mini-stat'><span>Spot</span><b>{format_money(total_value)}</b></div><div class='mini-stat'><span>Actifs</span><b>{len(portfolio)}</b></div><div class='mini-stat'><span>PnL</span><b class='{pct_class(total_pnl)}'>{format_pct(total_pnl_pct)}</b></div></div><div class='metric-grid'><span>Top gain <b class='positive'>{gain_txt}</b></span><span>Top perte <b class='negative'>{loss_txt}</b></span><span>Fear & Greed <b>{fng_display}<br>{fng_label}</b></span></div></section>", unsafe_allow_html=True)
 

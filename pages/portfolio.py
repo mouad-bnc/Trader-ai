@@ -11,6 +11,12 @@ from portfolio_analytics import format_money, format_pct
 
 
 def render_portfolio(*, portfolio, total_value: float, total_pnl: float, total_pnl_pct: float, market_ids, market_lookup, pct_class, render_holding_card, portfolio_service, connection_status: str, connection_message: str, last_sync: str | None, **_ignored_kwargs) -> None:
+    portfolio = portfolio if portfolio is not None else pd.DataFrame()
+    market_ids = market_ids or []
+    market_lookup = market_lookup or {}
+    connection_status = connection_status or "not_configured"
+    connection_message = str(connection_message or "Connexion Binance non configurée.")
+
     if portfolio.empty:
         render_empty_card("◒", "Votre portefeuille est prêt.", "Connectez Binance ou ajoutez une position pour afficher la valeur totale, l'allocation, le donut et la liste des actifs.")
     else:
@@ -24,7 +30,7 @@ def render_portfolio(*, portfolio, total_value: float, total_pnl: float, total_p
     elif connection_status == "imported_csv":
         render_empty_card("", "Portefeuille importé", connection_message, section_head=True, badge="CSV")
     else:
-        render_empty_card("", "Synchronisation Binance indisponible", html.escape(connection_message), section_head=True, badge="Attention")
+        render_empty_card("", "Synchronisation Binance indisponible", html.escape(str(connection_message or "")), section_head=True, badge="Attention")
     if not market_ids:
         render_empty_card("◌", "Données marché indisponibles", "Impossible d’ajouter ou modifier une position tant que les données marché sont absentes.")
     else:

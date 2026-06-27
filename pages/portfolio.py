@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 
 from binance import BinanceReadOnlyClient
+from components.ui import render_empty_card
 from portfolio_analytics import format_money, format_pct
 from portfolio_io import normalize_portfolio
 
@@ -13,11 +14,11 @@ from portfolio_io import normalize_portfolio
 def render_portfolio(*, portfolio, total_value: float, total_pnl: float, total_pnl_pct: float, market_ids, market_lookup, pct_class, render_holding_card) -> None:
     binance = BinanceReadOnlyClient()
     if portfolio.empty:
-        st.markdown("<section class='empty-card'><div class='empty-icon'>◒</div><h2>Votre portefeuille est prêt.</h2><p class='muted'>Connectez Binance ou ajoutez une position pour afficher la valeur totale, l'allocation, le donut et la liste des actifs.</p></section>", unsafe_allow_html=True)
+        render_empty_card("◒", "Votre portefeuille est prêt.", "Connectez Binance ou ajoutez une position pour afficher la valeur totale, l'allocation, le donut et la liste des actifs.")
     else:
         st.markdown(f"<section class='portfolio-card'><span class='eyebrow'>PORTEFEUILLE</span><div class='value'>{format_money(total_value)}</div><div class='donut'></div><div class='quick-grid'><div class='mini-stat'><span>Spot</span><b>{format_money(total_value)}</b></div><div class='mini-stat'><span>Allocation</span><b>{len(portfolio)} actifs</b></div><div class='mini-stat'><span>PnL</span><b class='{pct_class(total_pnl)}'>{format_pct(total_pnl_pct)}</b></div></div></section>", unsafe_allow_html=True)
     if not binance.configured:
-        st.markdown("<section class='empty-card'><div class='section-head'><h3>Binance</h3><span class='pill'>Hors ligne</span></div><p class='muted'>API absente. Activez une clé lecture seule pour synchroniser automatiquement vos soldes Spot.</p></section>", unsafe_allow_html=True)
+        render_empty_card("", "Binance", "API absente. Activez une clé lecture seule pour synchroniser automatiquement vos soldes Spot.", section_head=True, badge="Hors ligne")
         st.button("Connecter Binance", use_container_width=True)
     else:
         try:

@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import streamlit as st
 
+from components.ui import render_section_head_card
+
 
 def render_markets(*, market_objects, fng_display: str, dominance: float, render_market_card) -> None:
-    st.markdown(f"<section class='glass-card'><div class='section-head'><h2>Marchés</h2><span class='muted'>Fear & Greed {fng_display} · BTC {dominance:.1f}%</span></div></section>", unsafe_allow_html=True)
+    render_section_head_card("Marchés", f"Fear & Greed {fng_display} · BTC {dominance:.1f}%")
     query = st.text_input("Recherche crypto", placeholder="BTC, ETH, SOL…")
     filtered = [c for c in market_objects if not query or query.lower() in c.name.lower() or query.upper() in c.symbol]
     st.markdown("<h3>Meilleures hausses</h3>", unsafe_allow_html=True)

@@ -12,7 +12,7 @@ from coingecko import DEFAULT_COINS, CoinGeckoClient, MarketCoin, markets_to_fra
 from portfolio_analytics import enrich_portfolio, format_money, format_pct, recommendation_for, triggered_alerts
 from portfolio_io import empty_portfolio, normalize_portfolio, parse_binance_spot_csv
 
-APP_NAME = "Trader"
+APP_NAME = "Mouad Saissi - Trader"
 APP_VERSION = "5.0"
 GOLD = "#F3BA2F"
 GREEN = "#02C076"
@@ -250,7 +250,7 @@ fav_ids = set(st.session_state.portfolio.loc[st.session_state.portfolio["favorit
 best_row = portfolio.sort_values("pnl_pct", ascending=False).head(1) if not portfolio.empty else pd.DataFrame()
 worst_row = portfolio.sort_values("pnl_pct", ascending=True).head(1) if not portfolio.empty else pd.DataFrame()
 
-st.markdown("<div class='app-shell'><div class='topbar'><span class='icon-btn'>☰</span><div class='brand'>Trader</div><div class='nav-icons'><span class='icon-btn'>🔔</span><span class='icon-btn'>👤</span></div></div></div>", unsafe_allow_html=True)
+st.markdown(f"<div class='app-shell'><div class='topbar'><span class='icon-btn'>☰</span><div class='brand'>{html.escape(APP_NAME)}</div><div class='nav-icons'><span class='icon-btn'>🔔</span><span class='icon-btn'>👤</span></div></div></div>", unsafe_allow_html=True)
 sections = ["Accueil", "Marchés", "Wallet", "Bots", "News", "Calculateur", "Opportunités", "IA"]
 screen = st.radio("Navigation", sections, horizontal=True, label_visibility="collapsed", key="screen")
 fng_value, fng_label = fear_greed()

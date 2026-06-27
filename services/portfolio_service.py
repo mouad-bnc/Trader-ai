@@ -123,29 +123,46 @@ class PortfolioService:
         )
 
 
-    def sync_portfolio(self) -> BinanceSyncResult:
-        """Wrapper public sûr pour synchroniser le portefeuille Binance.
+    def sync_portfolio(self) -> dict[str, object]:
+        """Synchronise Binance via un wrapper public compatible et sûr.
 
-        L'ancien écran d'accueil appelle cette méthode au démarrage. Elle ne
-        doit donc jamais propager d'exception : sans configuration Binance ou
-        en cas d'erreur inattendue, elle renvoie un résultat propre affichable.
+        Cette fonction conserve une réponse dictionnaire minimale pour les
+        anciens appels de l'application, même sans clés Binance ou si Binance
+        est momentanément indisponible.
         """
 
         try:
             result = self.sync_binance_portfolio()
         except Exception:
-            return self._sync_error("error", "Synchronisation Binance impossible. Vérifie la configuration Binance.")
+            return {
+                "status": "error",
+                "message": "Synchronisation Binance indisponible.",
+                "portfolio": [],
+                "last_sync": None,
+            }
 
         if result.connection_status == "not_configured":
-            return result
-        if result.connection_status == "connected":
-            return result
-        return BinanceSyncResult(
-            portfolio=result.portfolio,
-            synced_at=result.synced_at,
-            connection_status="error",
-            message=result.message or "Synchronisation Binance impossible.",
-        )
+            return {
+                "status": "not_configured",
+                "message": "Connexion Binance non configurée.",
+                "portfolio": [],
+                "last_sync": None,
+            }
+
+        if result.connection_status != "connected":
+            return {
+                "status": "error",
+                "message": "Synchronisation Binance indisponible.",
+                "portfolio": [],
+                "last_sync": None,
+            }
+
+        return {
+            "status": "connected",
+            "message": result.message,
+            "portfolio": result.portfolio,
+            "last_sync": result.synced_at,
+        }
 
     def _sync_error(self, status: str, message: str) -> BinanceSyncResult:
         return BinanceSyncResult(portfolio=self.empty(), synced_at=None, connection_status=status, message=message)
@@ -196,7 +213,7 @@ def sync_binance_portfolio(binance_client: BinanceReadOnlyClient | None = None) 
     return PortfolioService(binance_client).sync_binance_portfolio()
 
 
-def sync_portfolio(binance_client: BinanceReadOnlyClient | None = None) -> BinanceSyncResult:
+def sync_portfolio(binance_client: BinanceReadOnlyClient | None = None) -> dict[str, object]:
     """Wrapper public sûr pour les anciens appels de synchronisation Binance."""
 
     return PortfolioService(binance_client).sync_portfolio()

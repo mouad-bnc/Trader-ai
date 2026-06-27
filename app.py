@@ -247,6 +247,10 @@ fng_value, fng_label = market_service.fear_greed()
 dominance = market_service.btc_dominance(market_objects)
 segments = portfolio_service.segment_allocation(total_value)
 fng_display = f"{fng_value}/100" if fng_value is not None else "Indisponible"
+connection_status = st.session_state.binance_connection_status
+connection_message = st.session_state.binance_connection_message
+last_portfolio_sync = st.session_state.last_portfolio_sync
+binance_configured = portfolio_service.binance_configured
 
 
 SCREEN_RENDERERS = {
@@ -266,9 +270,9 @@ SCREEN_RENDERERS = {
         fng_label=fng_label,
         pct_class=pct_class,
         sparkline_svg=sparkline_svg,
-        binance_configured=portfolio_service.binance_configured,
-        connection_status=st.session_state.binance_connection_status,
-        connection_message=st.session_state.binance_connection_message,
+        binance_configured=binance_configured,
+        connection_status=connection_status,
+        connection_message=connection_message,
     ),
     "Marchés": lambda: render_markets(
         market_objects=market_objects,
@@ -286,9 +290,9 @@ SCREEN_RENDERERS = {
         pct_class=pct_class,
         render_holding_card=render_holding_card,
         portfolio_service=portfolio_service,
-        connection_status=st.session_state.binance_connection_status,
-        connection_message=st.session_state.binance_connection_message,
-        last_sync=st.session_state.last_portfolio_sync,
+        connection_status=connection_status,
+        connection_message=connection_message,
+        last_sync=last_portfolio_sync,
     ),
     "Bots": render_bots,
     "Actualités": lambda: render_news(

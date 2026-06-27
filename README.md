@@ -21,16 +21,13 @@ Trader AI is a clean, production-ready Streamlit crypto dashboard built from scr
 ```text
 .
 ├── app.py
+├── analytics.py
+├── coingecko.py
+├── sample_data.py
 ├── requirements.txt
 ├── README.md
-├── .streamlit/
-│   └── config.toml
-└── src/
-    └── trader_ai/
-        ├── __init__.py
-        ├── analytics.py
-        ├── coingecko.py
-        └── sample_data.py
+└── .streamlit/
+    └── config.toml
 ```
 
 ## Install
@@ -39,7 +36,6 @@ Trader AI is a clean, production-ready Streamlit crypto dashboard built from scr
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-pip install -e .
 ```
 
 ## Run

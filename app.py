@@ -3,12 +3,15 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from trader_ai import __app_name__, __version__
-from trader_ai.analytics import enrich_portfolio, format_money, format_pct, recommendation_for
-from trader_ai.coingecko import DEFAULT_COINS, CoinGeckoClient, markets_to_frame
-from trader_ai.sample_data import default_portfolio
+from analytics import enrich_portfolio, format_money, format_pct, recommendation_for
+from coingecko import DEFAULT_COINS, CoinGeckoClient, MarketCoin, markets_to_frame
+from sample_data import default_portfolio
 
-st.set_page_config(page_title=f"{__app_name__} {__version__}", page_icon="🟢", layout="wide", initial_sidebar_state="expanded")
+APP_NAME = "Trader AI"
+APP_VERSION = "0.1"
+
+
+st.set_page_config(page_title=f"{APP_NAME} {APP_VERSION}", page_icon="🟢", layout="wide", initial_sidebar_state="expanded")
 
 st.markdown(
     """
@@ -28,7 +31,7 @@ st.markdown(
 st.markdown(
     f"""
     <section class="hero">
-      <span class="pill">{__app_name__} · v{__version__} · CoinGecko only</span>
+      <span class="pill">{APP_NAME} · v{APP_VERSION} · CoinGecko only</span>
       <h1>Crypto portfolio command center</h1>
       <p>Track a manual portfolio, monitor live public market data, and rank opportunities without API keys or exchange integrations.</p>
     </section>
@@ -74,7 +77,6 @@ if market_df.empty:
     st.stop()
 
 # Rehydrate market rows after Streamlit caching so analytics can work with typed objects.
-from trader_ai.coingecko import MarketCoin
 market_objects = [MarketCoin(**row.to_dict()) for _, row in market_df.iterrows()]
 market_ids = [coin.coin_id for coin in market_objects]
 

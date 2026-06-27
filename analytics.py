@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from trader_ai.coingecko import MarketCoin
+from coingecko import MarketCoin
 
 
 @dataclass(frozen=True)

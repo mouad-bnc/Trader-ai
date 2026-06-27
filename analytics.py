@@ -151,3 +151,42 @@ def enrich_portfolio(holdings: pd.DataFrame, markets: list[MarketCoin]) -> pd.Da
     total_value = float(frame["value"].sum()) if not frame.empty else 0
     frame["allocation_pct"] = frame["value"].apply(lambda value: (value / total_value * 100) if total_value else 0)
     return frame.sort_values("value", ascending=False)
+
+
+def portfolio_performance_frame(portfolio: pd.DataFrame, markets: list[MarketCoin]) -> pd.DataFrame:
+    """Build an estimated 7-day portfolio value curve from CoinGecko sparklines."""
+
+    if portfolio.empty:
+        return pd.DataFrame(columns=["point", "estimated_value"])
+    market_lookup = {coin.coin_id: coin for coin in markets}
+    max_points = max((len(coin.sparkline) for coin in markets), default=0)
+    if max_points == 0:
+        return pd.DataFrame(columns=["point", "estimated_value"])
+    values = [0.0] * max_points
+    for _, holding in portfolio.iterrows():
+        coin = market_lookup.get(str(holding.get("coin_id", "")).lower().strip())
+        quantity = float(holding.get("quantity") or 0)
+        if not coin or not coin.sparkline or quantity <= 0:
+            continue
+        padded = ([coin.sparkline[0]] * (max_points - len(coin.sparkline))) + coin.sparkline
+        values = [current + (price * quantity) for current, price in zip(values, padded)]
+    return pd.DataFrame({"point": range(1, max_points + 1), "estimated_value": values})
+
+
+def triggered_alerts(portfolio: pd.DataFrame, markets: list[MarketCoin]) -> pd.DataFrame:
+    """Return rows where current prices cross user-defined alert thresholds."""
+
+    market_lookup = {coin.coin_id: coin for coin in markets}
+    alerts: list[dict[str, object]] = []
+    for _, holding in portfolio.iterrows():
+        coin_id = str(holding.get("coin_id", "")).lower().strip()
+        coin = market_lookup.get(coin_id)
+        if not coin:
+            continue
+        below = float(holding.get("alert_below") or 0)
+        above = float(holding.get("alert_above") or 0)
+        if below > 0 and coin.current_price <= below:
+            alerts.append({"Asset": coin.symbol, "Price": coin.current_price, "Alert": f"At or below ${below:,.2f}"})
+        if above > 0 and coin.current_price >= above:
+            alerts.append({"Asset": coin.symbol, "Price": coin.current_price, "Alert": f"At or above ${above:,.2f}"})
+    return pd.DataFrame(alerts)

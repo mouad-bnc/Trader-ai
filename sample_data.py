@@ -1,15 +1,11 @@
-"""Default manual portfolio values for a useful first-run experience."""
+"""Legacy compatibility exports for Trader AI."""
 
 from __future__ import annotations
 
-import pandas as pd
+from portfolio_io import empty_portfolio
 
 
-def default_portfolio() -> pd.DataFrame:
-    return pd.DataFrame(
-        [
-            {"coin_id": "bitcoin", "quantity": 0.05, "avg_cost": 60000.0},
-            {"coin_id": "ethereum", "quantity": 1.2, "avg_cost": 2800.0},
-            {"coin_id": "solana", "quantity": 12.0, "avg_cost": 130.0},
-        ]
-    )
+def default_portfolio():
+    """Return an empty real portfolio instead of demo holdings."""
+
+    return empty_portfolio()

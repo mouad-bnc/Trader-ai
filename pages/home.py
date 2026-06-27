@@ -6,6 +6,15 @@ from components.ui import render_empty_card
 from portfolio_analytics import format_money, format_pct
 
 
+def _safe_number(value: object, default: float = 0.0) -> float:
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def render_home(
     *,
     best_row,
@@ -26,9 +35,10 @@ def render_home(
     binance_configured: bool,
     connection_status: str,
     connection_message: str,
+    **_ignored_kwargs,
 ) -> None:
     st.markdown("<div class='hero'><p>Bonjour Mouad 👋</p><h1>Votre cockpit crypto</h1></div>", unsafe_allow_html=True)
-    dominance_value = float(dominance or 0)
+    dominance_value = _safe_number(dominance, 0.0)
     top_gain = best_row.iloc[0] if best_row is not None and not best_row.empty else None
     top_loss = worst_row.iloc[0] if worst_row is not None and not worst_row.empty else None
     if portfolio.empty and not binance_configured:

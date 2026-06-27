@@ -24,15 +24,19 @@ def render_home(
     pct_class,
     sparkline_svg,
     binance_configured: bool,
+    connection_status: str,
+    connection_message: str,
 ) -> None:
     st.markdown("<div class='hero'><p>Bonjour Mouad 👋</p><h1>Votre cockpit crypto</h1></div>", unsafe_allow_html=True)
     top_gain = best_row.iloc[0] if not best_row.empty else None
     top_loss = worst_row.iloc[0] if not worst_row.empty else None
     if portfolio.empty and not binance_configured:
-        render_empty_card("⌁", "Connectez Binance pour afficher votre portefeuille.", "Vos soldes, votre allocation et votre PnL apparaîtront ici dès qu'une connexion lecture seule sera disponible.")
+        render_empty_card("⌁", "Connexion Binance non configurée", "Ajoutez BINANCE_API_KEY et BINANCE_API_SECRET côté serveur pour synchroniser automatiquement vos soldes Spot.")
         if st.button("Connecter Binance", use_container_width=True):
             st.toast("Ajoutez BINANCE_API_KEY et BINANCE_API_SECRET côté serveur pour activer la synchronisation.")
     else:
+        if connection_status not in {"connected", "not_configured", "imported_csv"}:
+            st.warning(connection_message)
         st.markdown(f"""
         <section class='portfolio-card float-in'><span class='eyebrow'>TABLEAU DE BORD</span><div class='value'>{format_money(total_value)}</div>
           <div class='quick-grid'><div class='mini-stat'><span>Variation du jour</span><b class='{pct_class(daily_pnl)}'>{format_money(daily_pnl)}<br>{format_pct(daily_pnl_pct)}</b></div><div class='mini-stat'><span>PnL global</span><b class='{pct_class(total_pnl)}'>{format_money(total_pnl)}<br>{format_pct(total_pnl_pct)}</b></div><div class='mini-stat'><span>BTC dominance</span><b>{dominance:.1f}%</b></div></div>

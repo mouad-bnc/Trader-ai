@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 import pandas as pd
+import requests
 
 from binance import BinanceAsset, BinanceReadOnlyClient
 from coingecko import MarketCoin
 from portfolio_analytics import enrich_portfolio, triggered_alerts
-from portfolio_io import empty_portfolio, normalize_portfolio, parse_binance_spot_csv
+from portfolio_io import SYMBOL_TO_COINGECKO_ID, empty_portfolio, normalize_portfolio, parse_binance_spot_csv
 
 
 @dataclass(frozen=True)
@@ -29,6 +31,19 @@ class PortfolioData:
     worst_row: pd.DataFrame
     allocation: dict[str, float]
     exposure: dict[str, float]
+
+
+STABLECOIN_IDS = {"USDT": "tether", "USDC": "usd-coin", "FDUSD": "first-digital-usd", "BUSD": "binance-usd", "DAI": "dai"}
+
+
+@dataclass(frozen=True)
+class BinanceSyncResult:
+    """Résultat propre de synchronisation Binance conservé en session."""
+
+    portfolio: pd.DataFrame
+    synced_at: str | None
+    connection_status: str
+    message: str
 
 
 class PortfolioService:
@@ -52,6 +67,63 @@ class PortfolioService:
 
     def binance_assets(self) -> list[BinanceAsset]:
         return self.binance_client.spot_assets()
+
+    def sync_binance_portfolio(self) -> BinanceSyncResult:
+        """Synchronise le portefeuille Spot Binance en lecture seule vers le format unique de l'app."""
+
+        if not self.binance_configured:
+            return BinanceSyncResult(
+                portfolio=self.empty(),
+                synced_at=None,
+                connection_status="not_configured",
+                message="Connexion Binance non configurée",
+            )
+
+        try:
+            assets = self.binance_assets()
+        except requests.Timeout:
+            return self._sync_error("timeout", "Binance ne répond pas pour le moment. Réessaie dans quelques instants.")
+        except requests.ConnectionError:
+            return self._sync_error("network_error", "Connexion réseau indisponible. Vérifie la connexion au serveur.")
+        except requests.HTTPError as exc:
+            status_code = exc.response.status_code if exc.response is not None else None
+            if status_code in {401, 403}:
+                return self._sync_error("invalid_keys", "Clés Binance invalides ou permissions lecture seule insuffisantes.")
+            if status_code in {418, 429, 500, 502, 503, 504}:
+                return self._sync_error("api_unavailable", "API Binance momentanément indisponible. Réessaie plus tard.")
+            return self._sync_error("binance_error", "Synchronisation Binance impossible pour le moment.")
+        except requests.RequestException:
+            return self._sync_error("network_error", "Connexion Binance indisponible. Réessaie dans quelques instants.")
+        except Exception:
+            return self._sync_error("binance_error", "Synchronisation Binance impossible. Vérifie la configuration Binance.")
+
+        rows = []
+        for asset in assets:
+            if asset.quantity <= 0 or asset.value <= 0:
+                continue
+            coin_id = STABLECOIN_IDS.get(asset.symbol) or SYMBOL_TO_COINGECKO_ID.get(asset.symbol, asset.symbol.lower())
+            rows.append(
+                {
+                    "coin_id": coin_id,
+                    "symbol": asset.symbol,
+                    "quantity": asset.quantity,
+                    "avg_cost": asset.current_price,
+                    "alert_below": 0.0,
+                    "alert_above": 0.0,
+                    "favorite": False,
+                    "notes": "Synchronisé depuis Binance Spot",
+                }
+            )
+
+        return BinanceSyncResult(
+            portfolio=normalize_portfolio(pd.DataFrame(rows)),
+            synced_at=datetime.now(timezone.utc).isoformat(),
+            connection_status="connected",
+            message="Portefeuille Binance synchronisé",
+        )
+
+    def _sync_error(self, status: str, message: str) -> BinanceSyncResult:
+        return BinanceSyncResult(portfolio=self.empty(), synced_at=None, connection_status=status, message=message)
 
     def build_data(self, holdings: pd.DataFrame, markets: list[MarketCoin], market_lookup: dict[str, MarketCoin]) -> PortfolioData:
         normalized = normalize_portfolio(holdings)
@@ -93,4 +165,10 @@ class PortfolioService:
         return {"crypto": max(total - cash, 0.0), "cash": cash}
 
 
-__all__ = ["PortfolioData", "PortfolioService"]
+def sync_binance_portfolio(binance_client: BinanceReadOnlyClient | None = None) -> BinanceSyncResult:
+    """Synchronise Binance Spot via le service portefeuille central."""
+
+    return PortfolioService(binance_client).sync_binance_portfolio()
+
+
+__all__ = ["BinanceSyncResult", "PortfolioData", "PortfolioService", "sync_binance_portfolio"]

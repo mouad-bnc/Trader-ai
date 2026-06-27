@@ -1,31 +1,38 @@
 # Trader AI
 
-**Version:** 1.0
+**Version:** 3.0
 
-Trader AI is a professional, mobile-first Streamlit crypto portfolio platform for educational research. It uses public CoinGecko market data, keeps portfolio editing local to the Streamlit session, and never places trades or requests exchange API keys.
+Trader AI is a premium, mobile-first Streamlit crypto intelligence application for educational research. It uses public CoinGecko market data, keeps portfolio editing local to the Streamlit session, and never places trades, requests exchange API keys, or connects to a trading API.
 
-## Features
+## Product experience
 
-- Modern dark responsive interface for desktop and mobile.
-- Real editable portfolio table with quantity, average cost, notes, favorites, and alert thresholds.
-- Binance Spot CSV import for balance snapshots (`Coin`, `Free`, `Locked`) and trade exports (`Base Asset`, `Side`, `Quantity`, `Price`).
-- CoinGecko market data, trending assets, sparklines, market ranks, volume, and 24h/7d/30d performance.
-- Portfolio value, cost basis, unrealized P&L, allocation, and estimated 7-day performance charts.
-- Watchlists and favorite assets.
-- Local price-alert highlighting when watched thresholds are crossed.
-- Transparent AI-style opportunity scoring based on momentum, liquidity, volatility, rank, and drawdown.
-- CSV export for backing up the local portfolio.
-- Educational-only disclaimers throughout the app.
+- Premium dark design system with black backgrounds, glass cards, soft shadows, gold accents, green gains, and red losses.
+- iPhone Safari-first layout targeting 390px screens, fixed icon-only bottom navigation, large touch targets, and no horizontal scrolling.
+- Home dashboard with a personal greeting, portfolio value, daily P&L, total return, refresh affordance, and notification icon.
+- Portfolio card with total value, daily gain, total gain, allocation leader, top performer, worst performer, and a mini performance chart.
+- Markets screen with card-based assets instead of tables. Each card includes coin logo, name, ticker, price, 24h and 7d performance, mini chart, market rank, volume, AI score, opportunity badge, risk badge, and favorite state.
+- Watchlist screen with search, add/remove favorites, sorting, filtering, and swipe-style premium cards.
+- Dedicated AI Intelligence screen with opportunity, trend, momentum, risk-control, and confidence scores plus a simple natural-language explanation.
+- Settings for theme, currency, refresh interval, about details, and the educational disclaimer.
+- Smooth transitions, button animations, card hover states, progress bars, and loading skeleton styling.
+
+## Data and safety principles
+
+- CoinGecko remains the only live market data provider.
+- No Binance API or trading API is used.
+- No custody, order placement, or exchange account connection exists.
+- CSV import is offline parsing only for educational portfolio setup.
+- AI scores are deterministic educational rubrics, not financial advice.
 
 ## Project structure
 
 ```text
 .
-├── app.py              # Streamlit UI and session workflow
-├── analytics.py        # Portfolio analytics, alerts, and AI scoring rubric
-├── coingecko.py        # Public CoinGecko client
-├── portfolio_io.py     # Editable portfolio schema and Binance CSV import
-├── sample_data.py      # Legacy compatibility wrapper returning an empty portfolio
+├── app.py                  # Premium mobile Streamlit UI and session workflow
+├── portfolio_analytics.py  # Portfolio analytics, alerts, and AI scoring rubric
+├── coingecko.py            # Public CoinGecko client
+├── portfolio_io.py         # Editable portfolio schema and offline CSV import
+├── sample_data.py          # Legacy compatibility wrapper returning an empty portfolio
 ├── requirements.txt
 ├── pyproject.toml
 └── README.md
@@ -54,18 +61,16 @@ Open the local URL shown by Streamlit, typically `http://localhost:8501`.
 3. Set the main file path to `app.py`.
 4. Use the default Python dependency install from `requirements.txt`.
 
-No secrets are required because the app does not use exchange APIs or private keys.
+No secrets are required because the app does not use private keys, exchange APIs, or trading credentials.
 
 ## Usage notes
 
 1. Add CoinGecko IDs in the sidebar, such as `bitcoin`, `ethereum`, or `solana`.
-2. Edit the portfolio table manually or import a Binance Spot CSV.
-3. Add optional alert thresholds and mark favorites.
-4. Review holdings, estimated performance, allocation, watchlists, market data, and AI opportunity scoring.
+2. Add holdings manually or import an offline Spot CSV snapshot.
+3. Mark favorites and maintain a watchlist.
+4. Review portfolio performance, market cards, alerts, and AI Intelligence scores.
 5. Export your portfolio CSV if you want to save your local session data.
 
-## Data source and limitations
+## Educational-only disclaimer
 
-Trader AI uses only public CoinGecko endpoints. Public endpoints can be rate limited or temporarily unavailable. Binance CSV import is offline parsing of user-uploaded files; the app does not connect to Binance.
-
-**Educational-only disclaimer:** Trader AI does not provide financial, investment, legal, or tax advice. AI opportunity scores are deterministic educational research rubrics and are not buy, sell, or hold recommendations.
+Trader AI does not provide financial, investment, legal, or tax advice. Opportunity scores and explanations are educational research tools only and are not buy, sell, or hold recommendations.

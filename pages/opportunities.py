@@ -165,7 +165,7 @@ def _decision_table(markets: list[MarketAsset], limit: int = 12) -> str:
 def render(services: dict[str, object]) -> None:
     cg = services["coingecko"]
     assert isinstance(cg, CoinGeckoService)
-    st.title("Opportunités")
+    st.markdown("<div class='page-kicker'><div><span class='pill'>Opportunités</span><h1>Opportunités</h1></div><span class='muted'>Table décisionnelle compacte · aucun conseil financier</span></div>", unsafe_allow_html=True)
     markets = cg.get_markets()
     ranked = sorted(markets, key=score, reverse=True)
     if not ranked:

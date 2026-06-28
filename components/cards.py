@@ -16,7 +16,23 @@ def empty_state(title: str, message: str) -> None:
     st.markdown(f"<div class='card empty'><span class='pill soft'>État sécurisé</span><h3>{html.escape(title)}</h3><p class='muted'>{html.escape(message)}</p></div>", unsafe_allow_html=True)
 
 
-def asset_card(asset: MarketAsset) -> None:
+def asset_card_html(asset: MarketAsset) -> str:
     klass = "positive" if asset.price_change_24h_pct >= 0 else "negative"
+    weekly_class = "positive" if asset.price_change_7d_pct >= 0 else "negative"
     logo = f"<img class='logo' src='{html.escape(asset.image)}'>" if asset.image else "<span class='logo pill'>✦</span>"
-    st.markdown(f"<div class='card'><div class='row'><div class='row'>{logo}<div><h3>{html.escape(asset.name)}</h3><p class='muted'>{html.escape(asset.symbol)} · Rang #{asset.market_cap_rank or '—'}</p></div></div><div style='text-align:right'><b>{money(asset.current_price)}</b><p class='{klass}'>{percent(asset.price_change_24h_pct)}</p></div></div>{sparkline(asset.sparkline, asset.price_change_24h_pct >= 0)}<div class='metric'><div><span class='muted'>Cap.</span><b>{money(asset.market_cap)}</b></div><div><span class='muted'>Volume</span><b>{money(asset.total_volume)}</b></div><div><span class='muted'>7 jours</span><b class='{ 'positive' if asset.price_change_7d_pct >= 0 else 'negative' }'>{percent(asset.price_change_7d_pct)}</b></div></div></div>", unsafe_allow_html=True)
+    return (
+        "<div class='card market-card compact-card'>"
+        f"<div class='row'><div class='row'>{logo}<div><h3>{html.escape(asset.name)}</h3>"
+        f"<p class='muted'>{html.escape(asset.symbol)} · Rang #{asset.market_cap_rank or '—'}</p></div></div>"
+        f"<div style='text-align:right'><b>{money(asset.current_price)}</b><p class='{klass}'>{percent(asset.price_change_24h_pct)}</p></div></div>"
+        f"{sparkline(asset.sparkline, asset.price_change_24h_pct >= 0)}"
+        "<div class='metric'>"
+        f"<div><span class='muted'>Cap.</span><b>{money(asset.market_cap)}</b></div>"
+        f"<div><span class='muted'>Volume</span><b>{money(asset.total_volume)}</b></div>"
+        f"<div><span class='muted'>7 jours</span><b class='{weekly_class}'>{percent(asset.price_change_7d_pct)}</b></div>"
+        "</div></div>"
+    )
+
+
+def asset_card(asset: MarketAsset) -> None:
+    st.markdown(asset_card_html(asset), unsafe_allow_html=True)

@@ -155,7 +155,7 @@ def render(services: dict[str, object]) -> None:
             f"<div><span class='pill soft'>{html.escape(bias)}</span><h3>{html.escape(asset.name)}</h3>"
             f"<p class='muted'>{html.escape(asset.symbol)} · {money(asset.current_price)}</p></div>"
             f"<div class='opportunity-price'><b>{percent_score(ai_score)}</b><span>Potentiel IA</span></div></div>"
-            f"<div class='metric-chips'>"
+            f"<div class='metric-chips compact-metrics-row'>"
             f"{_compact_metric('Potentiel IA', ai_score)}"
             f"{_compact_metric('Risque', asset_risk, risk_indicator=True)}"
             f"{_compact_metric('Confiance', confidence_score)}"
@@ -198,4 +198,4 @@ def _render_scanner(markets: list[MarketAsset]) -> None:
                 f"<p class='muted'>Risque {percent_score(asset_risk)}</p></div></div></div>"
             )
         body = "".join(cards) or "<p class='muted'>Aucun actif détecté pour ce filtre.</p>"
-        st.markdown(f"<div class='card'><div class='dashboard-section-title'><h3>{html.escape(title)}</h3></div><div class='mini-list'>{body}</div></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='card compact-card'><div class='dashboard-section-title'><h3>{html.escape(title)}</h3></div><div class='mini-list'>{body}</div></div>", unsafe_allow_html=True)

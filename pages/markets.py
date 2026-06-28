@@ -3,7 +3,7 @@ from __future__ import annotations
 import html
 
 import streamlit as st
-from components.cards import asset_card, empty_state
+from components.cards import asset_card_html, empty_state
 from components.charts import range_chart
 from services.coingecko_service import CoinGeckoService
 
@@ -30,14 +30,11 @@ def render(services: dict[str, object]) -> None:
             range_chart(f"Graphique interactif {focus.name}", values, selected_range)
         else:
             empty_state("Graphique indisponible", "Données insuffisantes pour afficher ce graphique.")
-        for asset in markets:
-            asset_card(asset)
+        st.markdown("<div class='market-grid'>" + "".join(asset_card_html(asset) for asset in markets) + "</div>", unsafe_allow_html=True)
     with tab2:
-        for asset in gainers:
-            asset_card(asset)
+        st.markdown("<div class='market-grid'>" + "".join(asset_card_html(asset) for asset in gainers) + "</div>", unsafe_allow_html=True)
     with tab3:
-        for asset in losers:
-            asset_card(asset)
+        st.markdown("<div class='market-grid'>" + "".join(asset_card_html(asset) for asset in losers) + "</div>", unsafe_allow_html=True)
 
 
 def _render_watchlist_ui(markets) -> None:

@@ -23,10 +23,16 @@ def render(services: dict[str, object]) -> None:
     portfolio_value = binance_summary.total_value_usdt if binance_summary and binance_summary.connected and binance_summary.positions else summary.total_value
     positions_count = len(binance_summary.positions) if binance_summary and binance_summary.connected else len(summary.positions)
 
-    st.markdown("<div class='cockpit-card-sm'><span class='pill'>Assistant contextuel</span><p class='muted'>Réponses en français, éducatives uniquement, basées sur le portefeuille disponible et les données marché chargées.</p></div>", unsafe_allow_html=True)
+    st.markdown(
+        "<div class='cockpit-card-sm'><div class='page-kicker'><div><span class='pill'>Assistant contextuel</span>"
+        "<p class='muted'>Réponses en français, éducatives uniquement, basées sur le portefeuille disponible et les données marché chargées.</p></div>"
+        "<div class='assistant-chip-row'><span class='assistant-chip'>Analyse portefeuille</span><span class='assistant-chip'>Risque BTC</span>"
+        "<span class='assistant-chip'>Opportunités</span><span class='assistant-chip'>Résumé marché</span></div></div></div>",
+        unsafe_allow_html=True,
+    )
     prompt = st.text_input("Votre question", placeholder="Analyse mon portefeuille et le risque actuel")
     if not prompt:
-        st.markdown("<div class='cockpit-card-sm'><b>Suggestions rapides</b><p class='muted'>Analyse portefeuille · Risque BTC · Opportunités · Résumé marché</p></div>", unsafe_allow_html=True)
+        st.markdown("<div class='cockpit-card-sm'><b>Prêt pour une question</b><p class='muted'>Choisissez une intention ci-dessus ou tapez une question. Analyse temporairement indisponible si les données marché ne chargent pas.</p></div>", unsafe_allow_html=True)
         return
 
     prompt_l = prompt.lower()

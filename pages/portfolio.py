@@ -63,23 +63,21 @@ def _render_binance_portfolio(summary: BinancePortfolioSummary) -> None:
         pnl_label = f"P&L 24h estimé {money(summary.pnl_24h_usdt)} · {percent(summary.pnl_24h_pct)}"
 
     last_sync = summary.last_sync_at.strftime("%d %b %Y · %H:%M UTC") if summary.last_sync_at else "Indisponible"
+    top_holding = max(summary.positions, key=lambda p: p.estimated_value_usdt, default=None)
     st.markdown(
-        f"<div class='cockpit-card-md'><span class='pill'>Binance connecté en lecture seule</span>"
-        f"<h2>{money(summary.total_value_usdt, 'USDT')}</h2>"
-        f"<p class='{pnl_class}'>{html.escape(pnl_label)}</p>"
-        f"<p class='muted'>{html.escape(summary.status_message)}</p>"
-        f"<p class='muted'>Dernière synchronisation: {html.escape(last_sync)}</p>"
-        f"<p class='muted'>Spot Binance lecture seule · Aucun endpoint de trading, transfert ou retrait.</p></div>",
+        f"<div class='cockpit-card-md'><div class='page-kicker'><div><span class='pill'>Binance connecté en lecture seule</span>"
+        f"<h2>{money(summary.total_value_usdt, 'USDT')}</h2><p class='{pnl_class}'>{html.escape(pnl_label)}</p></div>"
+        f"<span class='muted'>Dernière sync: {html.escape(last_sync)}</span></div>"
+        f"<div class='dense-summary-grid'>"
+        f"<div class='metric-chip'><span>Total</span><b>{money(summary.total_value_usdt, 'USDT')}</b><small>Valeur</small></div>"
+        f"<div class='metric-chip'><span>Allocation</span><b>{summary.asset_count}</b><small>Actifs</small></div>"
+        f"<div class='metric-chip'><span>Top holding</span><b>{html.escape(top_holding.asset if top_holding else '—')}</b><small>Principal</small></div>"
+        f"<div class='metric-chip'><span>P&L</span><b class='{pnl_class}'>{html.escape(pnl_label)}</b><small>24h estimé</small></div>"
+        f"<div class='metric-chip'><span>Risque</span><b>Lecture seule</b><small>Aucun trading</small></div>"
+        f"<div class='metric-chip'><span>Binance</span><b>Connecté</b><small>Spot / comptes</small></div>"
+        f"</div><p class='muted'>{html.escape(summary.status_message)} · Aucun endpoint de trading, transfert ou retrait.</p></div>",
         unsafe_allow_html=True,
     )
-
-    metric_cols = st.columns(6)
-    metric_cols[0].metric("Valeur portefeuille", money(summary.total_value_usdt, "USDT"))
-    metric_cols[1].metric("Spot", money(summary.spot_value_usdt, "USDT"))
-    metric_cols[2].metric("Futures", money(summary.futures_value_usdt, "USDT"))
-    metric_cols[3].metric("Earn", money(summary.earn_value_usdt, "USDT"))
-    metric_cols[4].metric("Funding", money(summary.funding_value_usdt, "USDT"))
-    metric_cols[5].metric("Assets", str(summary.asset_count))
 
     if summary.endpoint_warnings:
         warnings = "".join(f"<li>{html.escape(warning)}</li>" for warning in summary.endpoint_warnings)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -54,12 +55,32 @@ class CoinGeckoService:
     def __init__(self, base_url: str = "https://api.coingecko.com/api/v3", timeout: int = 8) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        self._cache: dict[str, tuple[float, Any]] = {}
 
-    def _get(self, path: str, params: dict[str, Any] | None = None) -> Any:
+    def _cache_get(self, key: str, ttl: int) -> Any | None:
+        cached = self._cache.get(key)
+        if not cached:
+            return None
+        timestamp, value = cached
+        if time.time() - timestamp > ttl:
+            self._cache.pop(key, None)
+            return None
+        return value
+
+    def _cache_set(self, key: str, value: Any) -> Any:
+        self._cache[key] = (time.time(), value)
+        return value
+
+    def _get(self, path: str, params: dict[str, Any] | None = None, ttl: int = 90) -> Any:
+        safe_params = params or {}
+        cache_key = f"{path}:{tuple(sorted(safe_params.items()))}"
+        cached = self._cache_get(cache_key, ttl)
+        if cached is not None:
+            return cached
         try:
-            response = requests.get(f"{self.base_url}{path}", params=params or {}, timeout=self.timeout, headers={"accept": "application/json", "user-agent": "Mouad-Capital-AI/3.0"})
+            response = requests.get(f"{self.base_url}{path}", params=safe_params, timeout=self.timeout, headers={"accept": "application/json", "user-agent": "Mouad-Capital-AI/3.0"})
             response.raise_for_status()
-            return response.json()
+            return self._cache_set(cache_key, response.json())
         except Exception:
             return None
 
@@ -127,17 +148,27 @@ class CoinGeckoService:
         return assets
 
     def global_metrics(self) -> dict[str, float]:
-        payload = self._get("/global")
+        payload = self._get("/global", ttl=300)
         data = payload.get("data", {}) if isinstance(payload, dict) else {}
         dominance = data.get("market_cap_percentage", {}) if isinstance(data, dict) else {}
-        return {"btc_dominance": safe_float(dominance.get("btc")), "market_cap_change_24h": safe_float(data.get("market_cap_change_percentage_24h_usd"))}
+        caps = data.get("total_market_cap", {}) if isinstance(data, dict) else {}
+        volumes = data.get("total_volume", {}) if isinstance(data, dict) else {}
+        return {
+            "btc_dominance": safe_float(dominance.get("btc")),
+            "market_cap_change_24h": safe_float(data.get("market_cap_change_percentage_24h_usd")),
+            "total_market_cap": safe_float(caps.get("usd")),
+            "total_volume": safe_float(volumes.get("usd")),
+        }
 
     def fear_greed(self) -> FearGreed:
+        cached = self._cache_get("fear_greed", 300)
+        if isinstance(cached, FearGreed):
+            return cached
         try:
             response = requests.get("https://api.alternative.me/fng/", params={"limit": 1, "format": "json"}, timeout=self.timeout)
             response.raise_for_status()
             data = (response.json().get("data") or [{}])[0]
-            return FearGreed(value=safe_int(data.get("value")), label=str(data.get("value_classification") or "Marché"))
+            return self._cache_set("fear_greed", FearGreed(value=safe_int(data.get("value")), label=str(data.get("value_classification") or "Marché")))
         except Exception:
             return FearGreed()
 

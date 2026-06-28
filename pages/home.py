@@ -43,16 +43,22 @@ def render(services: dict[str, object]) -> None:
     bz = services["binance"]
     assert isinstance(cg, CoinGeckoService) and isinstance(bz, BinanceService)
     markets = cg.get_markets()
+    metrics = cg.global_metrics()
+    fear = cg.fear_greed()
+    trending = cg.trending()
     binance_summary = bz.spot_portfolio(cg) if bz.configured else None
     has_binance_positions = bool(binance_summary and binance_summary.connected and binance_summary.positions)
     portfolio_label = money(binance_summary.total_value_usdt, "USDT") if has_binance_positions else "Indisponible"
     portfolio_message = "Total réel Binance Spot" if has_binance_positions else "Connectez Binance en lecture seule ou vérifiez que votre portefeuille Spot contient des actifs."
     avg_24h = sum(asset.price_change_24h_pct for asset in markets) / len(markets) if markets else 0
     best_asset = max(markets, key=lambda asset: asset.price_change_24h_pct) if markets else None
+    worst_asset = min(markets, key=lambda asset: asset.price_change_24h_pct) if markets else None
     ranked_opportunities = sorted(markets, key=score, reverse=True)[:3]
     market_cards = "".join(_market_item(asset) for asset in markets[:3]) or "<p class='muted'>Données marché indisponibles.</p>"
+    trending_cards = "".join(f"<span class='pill soft'>{html.escape(asset.symbol)}</span> " for asset in trending[:7]) or "<span class='muted'>Indisponible</span>"
     opportunity_cards = "".join(_opportunity_item(asset) for asset in ranked_opportunities) or "<p class='muted'>Aucune opportunité à afficher pour le moment.</p>"
     best_label = f"{best_asset.name} · {percent(best_asset.price_change_24h_pct)}" if best_asset else "Indisponible"
+    worst_label = f"{worst_asset.name} · {percent(worst_asset.price_change_24h_pct)}" if worst_asset else "Indisponible"
 
     st.markdown(
         f"""
@@ -67,6 +73,16 @@ def render(services: dict[str, object]) -> None:
             </div>
         </div>
         <div class='dashboard-grid'>
+            <section class='card dashboard-span-3'>
+                <div class='dashboard-section-title'><div><span class='pill'>Widgets</span><h3>Vue compacte</h3></div></div>
+                <div class='metric'>
+                    <div><span class='muted'>Total portfolio</span><b>{portfolio_label}</b></div>
+                    <div><span class='muted'>Today's gain</span><b class='positive'>{money(max(binance_summary.pnl_24h_usdt if has_binance_positions and binance_summary and binance_summary.pnl_24h_usdt else 0, 0), 'USDT')}</b></div>
+                    <div><span class='muted'>Today's loss</span><b class='negative'>{money(min(binance_summary.pnl_24h_usdt if has_binance_positions and binance_summary and binance_summary.pnl_24h_usdt else 0, 0), 'USDT')}</b></div>
+                    <div><span class='muted'>Open opportunities</span><b>{len(ranked_opportunities)}</b></div>
+                    <div><span class='muted'>Active bots</span><b>0</b></div>
+                </div>
+            </section>
             <section class='card dashboard-span-2'>
                 <div class='dashboard-section-title'><div><span class='pill'>Portefeuille</span><h2>Résumé premium</h2></div><b>{portfolio_label}</b></div>
                 <div class='metric'>
@@ -83,6 +99,18 @@ def render(services: dict[str, object]) -> None:
             <section class='card'>
                 <div class='dashboard-section-title'><div><span class='pill'>Marchés</span><h3>Cards live</h3></div><b class='{'positive' if avg_24h >= 0 else 'negative'}'>{percent(avg_24h)}</b></div>
                 <div class='mini-list'>{market_cards}</div>
+            </section>
+            <section class='card dashboard-span-3'>
+                <div class='dashboard-section-title'><div><span class='pill'>Market overview</span><h3>Marché crypto global</h3></div></div>
+                <div class='metric'>
+                    <div><span class='muted'>BTC dominance</span><b>{metrics.get('btc_dominance',0):.1f}%</b></div>
+                    <div><span class='muted'>Fear & Greed Index</span><b>{fear.value if fear.value is not None else '—'} % · {html.escape(fear.label)}</b></div>
+                    <div><span class='muted'>Total crypto market cap</span><b>{money(metrics.get('total_market_cap'))}</b></div>
+                    <div><span class='muted'>24h market volume</span><b>{money(metrics.get('total_volume'))}</b></div>
+                    <div><span class='muted'>Top gainers</span><b>{html.escape(best_label)}</b></div>
+                    <div><span class='muted'>Top losers</span><b>{html.escape(worst_label)}</b></div>
+                    <div><span class='muted'>Trending coins</span><b>{trending_cards}</b></div>
+                </div>
             </section>
             <section class='card dashboard-span-2'>
                 <div class='dashboard-section-title'><div><span class='pill'>Opportunités</span><h3>Top éducatif</h3></div><span class='muted'>Score · risque · confiance</span></div>

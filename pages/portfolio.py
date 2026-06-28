@@ -18,13 +18,30 @@ def render(services: dict[str, object]) -> None:
 
     if bz.configured:
         summary = bz.spot_portfolio(cg)
+        _render_binance_debug_panel(summary.debug)
         if summary.connected:
             _render_binance_portfolio(summary)
         else:
-            st.markdown("<div class='card hero'><span class='pill soft'>Connexion Binance indisponible</span><p class='muted'>Vérifiez les secrets Streamlit BINANCE_API_KEY et BINANCE_API_SECRET. Aucun secret n'est affiché.</p></div>", unsafe_allow_html=True)
+            message = html.escape(summary.status_message or "Vérifiez les secrets Streamlit BINANCE_API_KEY et BINANCE_API_SECRET. Aucun secret n'est affiché.")
+            st.markdown(f"<div class='card hero'><span class='pill soft'>Connexion Binance indisponible</span><p class='muted'>{message}</p></div>", unsafe_allow_html=True)
+            _render_manual_portfolio(pf.summarize([]), pf)
     else:
+        _render_binance_debug_panel(bz.last_debug)
         st.markdown("<div class='card hero'><span class='pill soft'>Binance non configuré</span><p class='muted'>Ajoutez BINANCE_API_KEY et BINANCE_API_SECRET aux secrets Streamlit pour afficher vos vrais soldes Spot en lecture seule.</p></div>", unsafe_allow_html=True)
         empty_state("Aucun portefeuille Binance", "Aucune donnée fictive n’est affichée : connectez Binance en lecture seule pour synchroniser vos avoirs réels.")
+        _render_manual_portfolio(pf.summarize([]), pf)
+
+
+def _render_binance_debug_panel(debug: dict[str, object]) -> None:
+    """Temporary safe diagnostics for Binance read-only synchronization."""
+    with st.expander("Réglages · debug Binance sécurisé", expanded=False):
+        st.write(f"API key present: {'oui' if debug.get('api_key_present') else 'non'}")
+        st.write(f"API secret present: {'oui' if debug.get('api_secret_present') else 'non'}")
+        st.write(f"Binance status code: {debug.get('status_code') if debug.get('status_code') is not None else 'indisponible'}")
+        st.write(f"Number of balances returned: {debug.get('balances_returned', 0)}")
+        st.write(f"Number of non-zero balances: {debug.get('non_zero_balances', 0)}")
+        if debug.get("error"):
+            st.write(f"Erreur: {html.escape(str(debug.get('error')))}")
 
 
 def _render_binance_portfolio(summary: BinancePortfolioSummary) -> None:
@@ -37,6 +54,7 @@ def _render_binance_portfolio(summary: BinancePortfolioSummary) -> None:
         f"<div class='card hero'><span class='pill'>Binance connecté en lecture seule</span>"
         f"<h2>{money(summary.total_value_usdt, 'USDT')}</h2>"
         f"<p class='{pnl_class}'>{html.escape(pnl_label)}</p>"
+        f"<p class='muted'>{html.escape(summary.status_message)}</p>"
         f"<p class='muted'>Soldes Spot réels · Valorisation publique USDT · Aucun endpoint de trading ou retrait.</p></div>",
         unsafe_allow_html=True,
     )
@@ -74,6 +92,7 @@ def _render_manual_portfolio(summary: PortfolioSummary, pf: PortfolioService) ->
     )
     if not summary.positions:
         empty_state("Aucune position", "Connectez Binance en lecture seule ou importez vos positions plus tard.")
+        return
     for pos in summary.positions:
         st.markdown(
             f"<div class='card'><div class='row'><div><h3>{html.escape(pos.holding.name)}</h3>"

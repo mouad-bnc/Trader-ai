@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from types import ModuleType
+from typing import Callable
+
 import streamlit as st
 
 from components.header import render_header
@@ -11,6 +14,21 @@ from services.news_service import NewsService
 from services.portfolio_service import PortfolioService
 from utils.constants import APP_NAME, NAV_ITEMS
 
+from pages import assistant, bots, calculator, home, markets, news, opportunities, portfolio
+
+PageRenderer = Callable[[dict[str, object]], None]
+
+PAGE_MODULES: dict[str, ModuleType] = {
+    "Accueil": home,
+    "Marchés": markets,
+    "Portefeuille": portfolio,
+    "Bots": bots,
+    "Actualités": news,
+    "Calculateur": calculator,
+    "Opportunités": opportunities,
+    "Trader IA": assistant,
+}
+
 
 def secret_value(key: str) -> str:
     try:
@@ -18,7 +36,17 @@ def secret_value(key: str) -> str:
     except Exception:
         return ""
 
-from pages import assistant, bots, calculator, home, markets, news, opportunities, portfolio
+
+def page_renderers() -> dict[str, PageRenderer]:
+    """Return Streamlit page routes and validate each page exposes render()."""
+    routes: dict[str, PageRenderer] = {}
+    for page_name, module in PAGE_MODULES.items():
+        renderer = getattr(module, "render", None)
+        if not callable(renderer):
+            module_name = getattr(module, "__name__", page_name)
+            raise AttributeError(f"Page module {module_name!r} must define a callable render(services) function.")
+        routes[page_name] = renderer
+    return routes
 
 
 def load_services() -> dict[str, object]:
@@ -36,8 +64,8 @@ def main() -> None:
     services = load_services()
     page = selected_page()
     render_header(page, NAV_ITEMS)
-    routes = {"Accueil": home.render, "Marchés": markets.render, "Portefeuille": portfolio.render, "Bots": bots.render, "Actualités": news.render, "Calculateur": calculator.render, "Opportunités": opportunities.render, "Trader IA": assistant.render}
-    routes.get(page, home.render)(services)
+    routes = page_renderers()
+    routes.get(page, routes["Accueil"])(services)
 
 
 if __name__ == "__main__":

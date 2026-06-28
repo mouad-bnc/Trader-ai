@@ -4,15 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "trader-ai"
-version = "0.1"
-description = "Assistant crypto premium mobile-first en Streamlit."
+version = "2.0.0"
+description = "Trader AI V2, application crypto premium mobile-first en Streamlit."
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = [
-    "streamlit>=1.36.0",
-    "pandas>=2.2.0",
-    "requests>=2.31.0",
-]
+dependencies = ["streamlit>=1.36.0", "pandas>=2.2.0", "requests>=2.31.0"]
 
 [tool.setuptools]
-py-modules = ["analytics", "portfolio_analytics", "coingecko", "sample_data", "portfolio_io", "binance"]
+packages = ["pages", "services", "components", "utils"]
+py-modules = ["app"]

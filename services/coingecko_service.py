@@ -57,7 +57,7 @@ class CoinGeckoService:
 
     def _get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         try:
-            response = requests.get(f"{self.base_url}{path}", params=params or {}, timeout=self.timeout, headers={"accept": "application/json", "user-agent": "Trader-AI/3.0"})
+            response = requests.get(f"{self.base_url}{path}", params=params or {}, timeout=self.timeout, headers={"accept": "application/json", "user-agent": "Mouad-Capital-AI/3.0"})
             response.raise_for_status()
             return response.json()
         except Exception:

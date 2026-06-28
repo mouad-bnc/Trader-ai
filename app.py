@@ -5,6 +5,7 @@ from typing import Callable
 
 import streamlit as st
 
+from components.footer import render_footer
 from components.header import render_header
 from components.navigation import selected_page
 from components.theme import apply_theme
@@ -26,7 +27,7 @@ PAGE_MODULES: dict[str, ModuleType] = {
     "Actualités": news,
     "Calculateur": calculator,
     "Opportunités": opportunities,
-    "Trader IA": assistant,
+    "Assistant AI": assistant,
 }
 
 
@@ -66,6 +67,7 @@ def main() -> None:
     render_header(page, NAV_ITEMS)
     routes = page_renderers()
     routes.get(page, routes["Accueil"])(services)
+    render_footer()
 
 
 if __name__ == "__main__":

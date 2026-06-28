@@ -1,7 +1,7 @@
-# Trader — Project Guide
+# Mouad Capital AI — Project Guide
 
 ## Vision
-Trader est un copilote crypto personnel et non un exchange.
+Mouad Capital AI est un copilote crypto personnel et non un exchange.
 L'application aide l'utilisateur à analyser son portefeuille, comprendre le marché et identifier les opportunités.
 
 ## Stack technique
@@ -27,7 +27,7 @@ L'application aide l'utilisateur à analyser son portefeuille, comprendre le mar
 - Actualités
 - Calculateur
 - Opportunités
-- Trader IA
+- Assistant AI
 
 Ne plus utiliser les noms Wallet, News ou IA.
 

@@ -14,7 +14,7 @@ from utils.helpers import clamp, money, percent
 def render(services: dict[str, object]) -> None:
     cg = services["coingecko"]; pf = services["portfolio"]; bz = services["binance"]
     assert isinstance(cg, CoinGeckoService) and isinstance(pf, PortfolioService) and isinstance(bz, BinanceService)
-    st.title("Portefeuille")
+    st.markdown("<div class='dashboard-micro-title'><div><span class='pill'>Portefeuille</span><h1>Portefeuille</h1></div><span class='muted'>Allocation · P&L · risque · Binance</span></div>", unsafe_allow_html=True)
 
     if bz.configured:
         summary = bz.account_portfolio(cg)
@@ -22,11 +22,11 @@ def render(services: dict[str, object]) -> None:
             _render_binance_portfolio(summary)
         else:
             message = html.escape(summary.status_message or "Vérifiez les secrets Streamlit BINANCE_API_KEY et BINANCE_API_SECRET. Aucun secret n'est affiché.")
-            st.markdown(f"<div class='card hero'><span class='pill soft'>Connexion Binance indisponible</span><p class='muted'>{message}</p></div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='cockpit-card-sm fallback-card'><span class='pill soft'>Connexion Binance indisponible</span><p class='muted'>{message}</p></div>", unsafe_allow_html=True)
             _render_binance_debug_panel(summary.debug)
             _render_manual_portfolio(pf.summarize([]), pf)
     else:
-        st.markdown("<div class='card hero'><span class='pill soft'>Binance non configuré</span><p class='muted'>Ajoutez BINANCE_API_KEY et BINANCE_API_SECRET aux secrets Streamlit pour synchroniser tous vos comptes Binance en lecture seule.</p></div>", unsafe_allow_html=True)
+        st.markdown("<div class='cockpit-card-sm fallback-card'><span class='pill soft'>Binance non configuré</span><p class='muted'>Ajoutez BINANCE_API_KEY et BINANCE_API_SECRET aux secrets Streamlit pour synchroniser tous vos comptes Binance en lecture seule.</p></div>", unsafe_allow_html=True)
         empty_state("Aucun portefeuille Binance", "Aucune donnée fictive n’est affichée : connectez Binance en lecture seule pour synchroniser vos avoirs réels.")
         _render_binance_debug_panel(bz.last_debug)
         _render_manual_portfolio(pf.summarize([]), pf)
@@ -64,7 +64,7 @@ def _render_binance_portfolio(summary: BinancePortfolioSummary) -> None:
 
     last_sync = summary.last_sync_at.strftime("%d %b %Y · %H:%M UTC") if summary.last_sync_at else "Indisponible"
     st.markdown(
-        f"<div class='card hero'><span class='pill'>Binance connecté en lecture seule</span>"
+        f"<div class='cockpit-card-md'><span class='pill'>Binance connecté en lecture seule</span>"
         f"<h2>{money(summary.total_value_usdt, 'USDT')}</h2>"
         f"<p class='{pnl_class}'>{html.escape(pnl_label)}</p>"
         f"<p class='muted'>{html.escape(summary.status_message)}</p>"
@@ -83,7 +83,7 @@ def _render_binance_portfolio(summary: BinancePortfolioSummary) -> None:
 
     if summary.endpoint_warnings:
         warnings = "".join(f"<li>{html.escape(warning)}</li>" for warning in summary.endpoint_warnings)
-        st.markdown(f"<div class='card'><span class='pill soft'>Synchronisation partielle</span><p class='muted'>Certains endpoints Binance sont indisponibles, les autres soldes restent affichés.</p><ul>{warnings}</ul></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='cockpit-card-sm fallback-card'><span class='pill soft'>Synchronisation partielle</span><p class='muted'>Certains endpoints Binance sont indisponibles, les autres soldes restent affichés.</p><ul>{warnings}</ul></div>", unsafe_allow_html=True)
 
     if not summary.positions:
         empty_state("Synchronisation Binance vide", "Binance est connecté en lecture seule, mais aucun solde non nul n'a été trouvé sur les endpoints disponibles.")
@@ -103,29 +103,31 @@ def _render_binance_portfolio(summary: BinancePortfolioSummary) -> None:
 
     st.subheader("Plus grandes positions")
 
-    for pos in summary.positions[:10]:
-        pnl_text = "P&L indisponible"
+    rows = []
+    for pos in summary.positions[:14]:
+        pnl_text = "Historique insuffisant"
         pnl_class = "muted"
         if pos.pnl_24h_usdt is not None and pos.pnl_24h_pct is not None:
             pnl_class = "positive" if pos.pnl_24h_usdt >= 0 else "negative"
             pnl_text = f"{money(pos.pnl_24h_usdt)} · {percent(pos.pnl_24h_pct)}"
-        price_text = money(pos.price_usdt, "USDT") if pos.price_usdt else "Prix USDT indisponible"
-        wallets_text = " · ".join(f"{html.escape(wallet)} {amount:g}" for wallet, amount in sorted(pos.wallet_amounts.items()) if amount > 0)
-        st.markdown(
-            f"<div class='card'><div class='row'><div>"
-            f"<h3>{html.escape(pos.asset)}</h3>"
-            f"<p class='muted'>{pos.total:g} {html.escape(pos.asset)} · Libre {pos.free:g} · Bloqué {pos.locked:g}</p>"
-            f"<p class='muted'>{wallets_text}</p>"
-            f"<p class='muted'>Prix: {html.escape(price_text)} · Allocation {pos.allocation_pct:.1f}%</p>"
-            f"</div><div style='text-align:right'><b>{money(pos.estimated_value_usdt, 'USDT')}</b>"
-            f"<p class='{pnl_class}'>{html.escape(pnl_text)}</p></div></div></div>",
-            unsafe_allow_html=True,
+        price_text = money(pos.price_usdt, "USDT") if pos.price_usdt else "Indisponible"
+        wallets_text = " · ".join(f"{html.escape(wallet)} {amount:g}" for wallet, amount in sorted(pos.wallet_amounts.items()) if amount > 0) or "—"
+        rows.append(
+            "<tr>"
+            f"<td data-label='Actif'><b>{html.escape(pos.asset)}</b><br><span class='muted'>{pos.total:g} · libre {pos.free:g}</span></td>"
+            f"<td data-label='Valeur'>{money(pos.estimated_value_usdt, 'USDT')}</td>"
+            f"<td data-label='Prix'>{html.escape(price_text)}</td>"
+            f"<td data-label='Allocation'>{pos.allocation_pct:.1f}%</td>"
+            f"<td data-label='P&L 24h'><span class='{pnl_class}'>{html.escape(pnl_text)}</span></td>"
+            f"<td data-label='Wallets'><span class='muted'>{wallets_text}</span></td>"
+            "</tr>"
         )
+    st.markdown("<div class='cockpit-card'><div class='cockpit-table-wrap'><table class='cockpit-table'><thead><tr><th>Actif</th><th>Valeur</th><th>Prix</th><th>Allocation</th><th>P&L 24h</th><th>Wallets</th></tr></thead><tbody>" + "".join(rows) + "</tbody></table></div></div>", unsafe_allow_html=True)
 
 
 def _render_manual_portfolio(summary: PortfolioSummary, pf: PortfolioService) -> None:
     st.markdown(
-        f"<div class='card hero'><span class='pill'>Mode portefeuille manuel</span>"
+        f"<div class='cockpit-card-md'><span class='pill'>Mode portefeuille manuel</span>"
         f"<h2>{money(summary.total_value)}</h2>"
         f"<p class='{ 'positive' if summary.pnl >= 0 else 'negative' }'>{money(summary.pnl)} · {percent(summary.pnl_pct)}</p>"
         f"<p class='muted'>Ajoutez BINANCE_API_KEY et BINANCE_API_SECRET aux secrets Streamlit pour activer la lecture seule Binance.</p></div>",
@@ -161,7 +163,7 @@ def _render_portfolio_intelligence(summary: BinancePortfolioSummary, allocations
     best_label = f"{html.escape(best.asset)} · {percent(best.pnl_24h_pct)}" if best else "Historique insuffisant pour calculer cette performance."
     worst_label = f"{html.escape(worst.asset)} · {percent(worst.pnl_24h_pct)}" if worst else "Historique insuffisant pour calculer cette performance."
     st.markdown(
-        f"<div class='card'><div class='metric'>"
+        f"<div class='cockpit-card-sm'><div class='metric'>"
         f"<div><span class='muted'>P&L quotidien estimé</span><b>{html.escape(daily)}</b></div>"
         f"<div><span class='muted'>P&L hebdomadaire estimé</span><b>{html.escape(weekly)}</b></div>"
         f"<div><span class='muted'>P&L mensuel estimé</span><b>{html.escape(monthly)}</b></div>"
@@ -199,7 +201,7 @@ def _render_ai_insights(summary: BinancePortfolioSummary) -> None:
     reduce = "Réduire progressivement la concentration sur l'actif principal." if largest > 50 else "Conserver une exposition équilibrée et surveiller la volatilité."
     improve = "Renforcer les actifs avec momentum positif confirmé, sans augmenter le risque global."
     st.markdown(
-        f"<div class='card'><div class='metric'>"
+        f"<div class='cockpit-card-sm'><div class='metric'>"
         f"<div><span class='muted'>Santé du portefeuille</span><b>{health:.0f} % · {_status_positive(health)}</b></div>"
         f"<div><span class='muted'>Diversification</span><b>{diversification:.0f} % · {_status_positive(diversification)}</b></div>"
         f"<div><span class='muted'>Risque</span><b>{risk_value:.0f} % · {_status_risk(risk_value)}</b></div>"

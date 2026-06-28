@@ -82,6 +82,8 @@ def render(services: dict[str, object]) -> None:
     best_asset = max(markets, key=lambda asset: asset.price_change_24h_pct) if markets else None
     worst_asset = min(markets, key=lambda asset: asset.price_change_24h_pct) if markets else None
     ranked_opportunities = sorted(markets, key=score, reverse=True)[:3]
+    avg_risk = sum(risk(asset) for asset in markets) / len(markets) if markets else 0
+    avg_confidence = sum(confidence(asset) for asset in markets) / len(markets) if markets else 0
     top_opportunity = ranked_opportunities[0] if ranked_opportunities else None
     market_cards = "".join(_market_item(asset) for asset in markets[:6]) or "<p class='muted'>Données marché indisponibles.</p>"
     trending_cards = "".join(f"<span class='pill soft'>{html.escape(asset.symbol)}</span> " for asset in trending[:7]) or "<span class='muted'>Indisponible</span>"
@@ -113,8 +115,10 @@ def render(services: dict[str, object]) -> None:
             <section class='kpi-strip'>
                 <div class='kpi-tile'><span>Valeur portefeuille</span><b>{portfolio_label}</b><small>{portfolio_message}</small></div>
                 <div class='kpi-tile'><span>P&L 24h</span><b class='{daily_pnl_class}'>{money(daily_pnl, 'USDT')}</b><small>Binance Spot</small></div>
+                <div class='kpi-tile'><span>Risque</span><b>{avg_risk:.0f} %</b><small>Score agrégé</small></div>
+                <div class='kpi-tile'><span>Confiance</span><b>{avg_confidence:.0f} %</b><small>Qualité données</small></div>
                 <div class='kpi-tile'><span>Statut marché</span><b class='{market_class}'>{percent(avg_24h)}</b><small>Moyenne actifs suivis</small></div>
-                <div class='kpi-tile'><span>Opportunités</span><b>{len(ranked_opportunities)}</b><small>Décisions IA compactes</small></div>
+                <div class='kpi-tile'><span>Top opportunité</span><b>{html.escape(top_opportunity.symbol if top_opportunity else '—')}</b><small>{len(ranked_opportunities)} décisions IA</small></div>
                 <div class='kpi-tile'><span>Fear & Greed</span><b>{fear.value if fear.value is not None else '—'} %</b><small>{html.escape(fear.label)}</small></div>
                 <div class='kpi-tile'><span>Dominance BTC</span><b>{metrics.get('btc_dominance',0):.1f}%</b><small>Marché global</small></div>
             </section>

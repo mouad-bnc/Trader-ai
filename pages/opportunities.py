@@ -130,6 +130,38 @@ def _target_section(asset: MarketAsset, ai_score: float) -> str:
     )
 
 
+
+def _decision_table(markets: list[MarketAsset], limit: int = 12) -> str:
+    rows = []
+    for asset in markets[:limit]:
+        ai_score = score(asset)
+        asset_risk = risk(asset)
+        confidence_score = confidence(asset)
+        asset_momentum = momentum(asset)
+        bias = recommendation(ai_score, asset_risk, confidence_score)
+        reason = _why_points(asset, asset_risk)[0]
+        target = "—"
+        if asset.current_price > 0 and asset.high_24h > 0:
+            target = money(max(asset.high_24h, asset.current_price * (1 + ai_score / 1000)))
+        rows.append(
+            "<tr>"
+            f"<td data-label='Asset'><b>{html.escape(asset.symbol)}</b><br><span class='muted'>{html.escape(asset.name)}</span></td>"
+            f"<td data-label='Prix'>{money(asset.current_price)}</td>"
+            f"<td data-label='Potentiel IA'><b>{percent_score(ai_score)}</b></td>"
+            f"<td data-label='Risque'><b>{percent_score(asset_risk)}</b></td>"
+            f"<td data-label='Confiance'><b>{percent_score(confidence_score)}</b></td>"
+            f"<td data-label='Momentum'><b>{percent(asset_momentum)}</b></td>"
+            f"<td data-label='Status'><span class='pill soft'>{html.escape(bias)}</span></td>"
+            f"<td data-label='Raison'><span class='muted'>{html.escape(reason)}</span></td>"
+            f"<td data-label='Cible'>{html.escape(target)}</td>"
+            "</tr>"
+        )
+    return (
+        "<div class='cockpit-table-wrap'><table class='cockpit-table'>"
+        "<thead><tr><th>Asset</th><th>Prix</th><th>Potentiel IA</th><th>Risque</th><th>Confiance</th><th>Momentum</th><th>Status</th><th>Raison courte</th><th>Cible</th></tr></thead>"
+        f"<tbody>{''.join(rows)}</tbody></table></div>"
+    )
+
 def render(services: dict[str, object]) -> None:
     cg = services["coingecko"]
     assert isinstance(cg, CoinGeckoService)
@@ -140,8 +172,10 @@ def render(services: dict[str, object]) -> None:
         empty_state("Aucune opportunité", "L'analyse reprendra automatiquement lorsque les prix seront disponibles.")
         return
 
-    st.markdown("<div class='card compact-card'><span class='pill'>Scanner IA</span><p class='muted'>Détection éducative compacte : breakouts, survente, momentum fort et anomalies de volume. Ceci n'est pas un conseil financier.</p></div>", unsafe_allow_html=True)
+    st.markdown("<div class='cockpit-container'><div class='cockpit-card-sm'><span class='pill'>Scanner IA</span><p class='muted'>Vue décision compacte : asset, prix, potentiel, risque, confiance, momentum, status, raison et cible. Ceci n'est pas un conseil financier.</p></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='cockpit-card'>{_decision_table(ranked)}</div>", unsafe_allow_html=True)
     _render_scanner(ranked)
+    st.markdown("</div>", unsafe_allow_html=True)
     for asset in ranked[:3]:
         ai_score = score(asset)
         asset_risk = risk(asset)
@@ -198,4 +232,4 @@ def _render_scanner(markets: list[MarketAsset]) -> None:
                 f"<p class='muted'>Risque {percent_score(asset_risk)}</p></div></div></div>"
             )
         body = "".join(cards) or "<p class='muted'>Aucun actif détecté pour ce filtre.</p>"
-        st.markdown(f"<div class='card compact-card'><div class='dashboard-section-title'><h3>{html.escape(title)}</h3></div><div class='mini-list'>{body}</div></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='cockpit-card-sm'><div class='dashboard-micro-title'><h3>{html.escape(title)}</h3></div><div class='mini-list'>{body}</div></div>", unsafe_allow_html=True)

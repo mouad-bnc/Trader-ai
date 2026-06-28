@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import html
+
 import streamlit as st
 from components.cards import empty_state
 from pages.opportunities import confidence, percent_score, risk, score
@@ -17,25 +19,64 @@ def _signal(ai_score: float, asset_risk: float, confidence_score: float) -> tupl
     return "Wait", "dot-wait"
 
 
-def _render_kpi(label: str, value: str, help_text: str, delta: str | None = None) -> None:
-    with st.container(border=True):
-        st.metric(label=label, value=value, delta=delta, help=help_text)
-        st.caption(help_text)
+def _render_kpi_grid(items: list[tuple[str, str, str, str | None]]) -> None:
+    cards = []
+    for label, value, help_text, delta in items:
+        delta_html = f"<span class='home-kpi-delta'>{html.escape(delta)}</span>" if delta else ""
+        cards.append(
+            "<div class='home-kpi-card'>"
+            f"<span>{html.escape(label)}</span>"
+            f"<b>{html.escape(value)}</b>"
+            f"<small>{html.escape(help_text)}</small>"
+            f"{delta_html}"
+            "</div>"
+        )
+    st.markdown(f"<div class='home-kpi-grid'>{''.join(cards)}</div>", unsafe_allow_html=True)
 
 
-def _render_watchlist_row(asset: MarketAsset) -> None:
+def _watchlist_row_html(asset: MarketAsset) -> str:
     ai_score = score(asset)
     asset_risk = risk(asset)
     confidence_score = confidence(asset)
-    signal, _ = _signal(ai_score, asset_risk, confidence_score)
-    trend = percent(asset.price_change_24h_pct)
-    cols = st.columns([0.9, 1.4, 1, 1, 0.9], vertical_alignment="center")
-    cols[0].markdown(f"**{asset.symbol}**")
-    cols[1].caption(asset.name)
-    cols[2].markdown(money(asset.current_price))
-    cols[3].metric("24h", trend)
-    cols[4].metric("Score IA", percent_score(ai_score))
-    st.caption(f"Signal : {signal}")
+    signal, dot_class = _signal(ai_score, asset_risk, confidence_score)
+    trend_class = "positive" if asset.price_change_24h_pct >= 0 else "negative"
+    signal_class = f"signal-{signal.lower()}"
+    return (
+        "<div class='home-watch-row'>"
+        "<div class='watch-left'>"
+        f"<span class='status-dot {html.escape(dot_class)}'></span>"
+        "<div class='watch-asset'>"
+        f"<b>{html.escape(asset.symbol)}</b>"
+        f"<small>{html.escape(asset.name)}</small>"
+        "</div>"
+        "</div>"
+        "<div class='watch-right'>"
+        "<div class='watch-price'>"
+        f"<b>{html.escape(money(asset.current_price))}</b>"
+        f"<small class='{trend_class}'>{html.escape(percent(asset.price_change_24h_pct))}</small>"
+        "</div>"
+        "<div class='watch-chips'>"
+        f"<span>IA {html.escape(percent_score(ai_score))}</span>"
+        f"<span class='{html.escape(signal_class)}'>{html.escape(signal)}</span>"
+        "</div>"
+        "</div>"
+        "</div>"
+    )
+
+
+def _render_watchlist(markets: list[MarketAsset], market_trend: str) -> None:
+    rows = "".join(_watchlist_row_html(asset) for asset in markets[:5])
+    body = rows or "<p class='muted'>Watchlist indisponible.</p>"
+    st.markdown(
+        "<section class='home-watch-card'>"
+        "<div class='home-watch-head'>"
+        "<div><span class='pill soft'>Watchlist</span><h2>Top 5 actifs</h2></div>"
+        f"<div class='home-trend'><span>Tendance</span><b>{html.escape(market_trend)}</b></div>"
+        "</div>"
+        f"<div class='home-watch-list'>{body}</div>"
+        "</section>",
+        unsafe_allow_html=True,
+    )
 
 
 def render(services: dict[str, object]) -> None:
@@ -67,36 +108,18 @@ def render(services: dict[str, object]) -> None:
         st.title(HOME_TITLE)
         st.caption(HOME_SUBTITLE)
 
-    kpi_rows = [
+    _render_kpi_grid(
         [
             ("Portfolio", portfolio_label, portfolio_message, None),
             ("P&L 24h", money(daily_pnl, "USDT"), "Binance Spot", None),
             ("Risque", f"{avg_risk:.0f}%", "Score agrégé", None),
             ("Confiance", f"{avg_confidence:.0f}%", "Qualité données", None),
-        ],
-        [
             ("Tendance marché", market_trend, "Moyenne watchlist", None),
             ("Fear & Greed", fear_value, fear.label, None),
             ("Top opportunité", top_symbol, top_caption, None),
             ("Dominance BTC", btc_dominance, "Marché global", None),
-        ],
-    ]
-    for row in kpi_rows:
-        for column, (label, value, help_text, delta) in zip(st.columns(4), row, strict=True):
-            with column:
-                _render_kpi(label, value, help_text, delta)
-
-    with st.container(border=True):
-        title_col, trend_col = st.columns([3, 1], vertical_alignment="center")
-        title_col.subheader("Watchlist · Top 5 actifs")
-        trend_col.metric("Tendance", market_trend)
-        if markets:
-            header = st.columns([0.9, 1.4, 1, 1, 0.9], vertical_alignment="center")
-            for col, label in zip(header, ["Symbole", "Actif", "Prix", "24h", "IA"], strict=True):
-                col.caption(label)
-            for asset in markets[:5]:
-                _render_watchlist_row(asset)
-        else:
-            st.caption("Watchlist indisponible.")
+        ]
+    )
+    _render_watchlist(markets, market_trend)
     if not markets:
         empty_state("Données marché indisponibles", "Aucune donnée live n'a pu être chargée. Les pages restent accessibles avec des états vides élégants.")

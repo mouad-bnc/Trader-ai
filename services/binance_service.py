@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlencode
 
@@ -44,6 +44,7 @@ class BinancePortfolioSummary:
     pnl_24h_pct: float | None = None
     connected: bool = False
     status_message: str = "Connexion Binance indisponible"
+    debug: dict[str, Any] = field(default_factory=dict)
 
 
 class BinanceService:
@@ -61,48 +62,44 @@ class BinanceService:
         self.api_secret = (api_secret or "").strip()
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        self._server_time_offset_ms: int | None = None
+        self.last_debug: dict[str, Any] = self._debug_template()
 
     @property
     def configured(self) -> bool:
         return bool(self.api_key and self.api_secret)
 
+    def secrets_status(self) -> dict[str, bool]:
+        return {"api_key_present": bool(self.api_key), "api_secret_present": bool(self.api_secret)}
+
     def account_snapshot(self) -> list[BinanceBalance]:
         """Return non-zero Spot balances from Binance account information."""
-        if not self.configured:
-            return []
-        payload = self._signed_get("/api/v3/account")
-        balances = payload.get("balances", []) if isinstance(payload, dict) else []
-        result: list[BinanceBalance] = []
-        for row in balances:
-            try:
-                free = safe_float(row.get("free"))
-                locked = safe_float(row.get("locked"))
-                asset = str(row.get("asset", "")).upper().strip()
-                if asset and free + locked > 0:
-                    result.append(BinanceBalance(asset, free, locked))
-            except (AttributeError, TypeError, ValueError):
-                continue
-        return result
+        summary = self.spot_portfolio()
+        return [BinanceBalance(position.asset, position.free, position.locked) for position in summary.positions]
 
     def spot_portfolio(self, coingecko: Any | None = None) -> BinancePortfolioSummary:
         """Return Spot balances enriched with CoinGecko USDT valuation when available."""
         if not self.configured:
-            return BinancePortfolioSummary([], 0.0)
-        payload = self._signed_get("/api/v3/account")
+            debug = self._debug_template()
+            self.last_debug = debug
+            return BinancePortfolioSummary([], 0.0, debug=debug)
+
+        payload, debug = self._signed_get("/api/v3/account")
         balances_payload = payload.get("balances", []) if isinstance(payload, dict) else []
         if not isinstance(balances_payload, list):
-            return BinancePortfolioSummary([], 0.0)
+            debug["error"] = "Réponse Binance inattendue: balances indisponibles."
+            self.last_debug = debug
+            return BinancePortfolioSummary([], 0.0, connected=False, status_message=debug["error"], debug=debug)
 
-        balances: list[BinanceBalance] = []
-        for row in balances_payload:
-            try:
-                free = safe_float(row.get("free"))
-                locked = safe_float(row.get("locked"))
-                asset = str(row.get("asset", "")).upper().strip()
-                if asset and free + locked > 0:
-                    balances.append(BinanceBalance(asset, free, locked))
-            except (AttributeError, TypeError, ValueError):
-                continue
+        debug["balances_returned"] = len(balances_payload)
+        balances = self._non_zero_balances(balances_payload)
+        debug["non_zero_balances"] = len(balances)
+
+        if debug.get("status_code") != 200:
+            status = str(debug.get("error") or "") or self._safe_error_message(payload, debug.get("status_code"))
+            debug["error"] = status
+            self.last_debug = debug
+            return BinancePortfolioSummary([], 0.0, connected=False, status_message=status, debug=debug)
 
         coingecko_prices = self._coingecko_prices(balances, coingecko) if balances else {}
         tickers = self._ticker_24h_by_symbol() if balances else {}
@@ -128,7 +125,22 @@ class BinanceService:
         for position in positions:
             position.allocation_pct = (position.estimated_value_usdt / total_value * 100) if total_value else 0.0
         pnl_pct_total = (total_pnl_24h / (total_value - total_pnl_24h) * 100) if has_pnl and (total_value - total_pnl_24h) else None
-        return BinancePortfolioSummary(positions, total_value, total_pnl_24h if has_pnl else None, pnl_pct_total, True, "Binance connecté en lecture seule")
+        status = f"{len(positions)} actifs Spot récupérés depuis Binance · Valeur estimée: {total_value:,.2f} USDT"
+        self.last_debug = debug
+        return BinancePortfolioSummary(positions, total_value, total_pnl_24h if has_pnl else None, pnl_pct_total, True, status, debug)
+
+    def _non_zero_balances(self, balances_payload: list[Any]) -> list[BinanceBalance]:
+        balances: list[BinanceBalance] = []
+        for row in balances_payload:
+            try:
+                free = safe_float(row.get("free"))
+                locked = safe_float(row.get("locked"))
+                asset = str(row.get("asset", "")).upper().strip()
+                if asset and free + locked > 0:
+                    balances.append(BinanceBalance(asset, free, locked))
+            except (AttributeError, TypeError, ValueError):
+                continue
+        return balances
 
     def _ticker_24h_by_symbol(self) -> dict[str, dict[str, Any]]:
         payload = self._public_get("/api/v3/ticker/24hr")
@@ -168,13 +180,57 @@ class BinanceService:
         except Exception:
             return None
 
-    def _signed_get(self, path: str, params: dict[str, Any] | None = None) -> Any:
-        query = {**(params or {}), "timestamp": int(time.time() * 1000)}
-        signature = hmac.new(self.api_secret.encode(), urlencode(query).encode(), hashlib.sha256).hexdigest()
-        query["signature"] = signature
+    def _signed_get(self, path: str, params: dict[str, Any] | None = None) -> tuple[Any, dict[str, Any]]:
+        debug = self._debug_template()
+        if not self.configured:
+            return {}, debug
+        query = {**(params or {}), "recvWindow": 5000, "timestamp": self._timestamp_ms()}
+        query["signature"] = self._signature(query)
         try:
             response = requests.get(f"{self.base_url}{path}", params=query, headers={"X-MBX-APIKEY": self.api_key}, timeout=self.timeout)
+            debug["status_code"] = response.status_code
+            payload = response.json() if response.content else {}
+            if response.status_code == 400 and isinstance(payload, dict) and payload.get("code") == -1021:
+                self._sync_server_time_offset()
+                query = {**(params or {}), "recvWindow": 5000, "timestamp": self._timestamp_ms()}
+                query["signature"] = self._signature(query)
+                response = requests.get(f"{self.base_url}{path}", params=query, headers={"X-MBX-APIKEY": self.api_key}, timeout=self.timeout)
+                debug["status_code"] = response.status_code
+                payload = response.json() if response.content else {}
+            return payload, debug
+        except requests.RequestException:
+            debug["error"] = "Connexion à Binance impossible."
+            return {}, debug
+        except ValueError:
+            debug["error"] = "Réponse Binance illisible."
+            return {}, debug
+
+    def _timestamp_ms(self) -> int:
+        offset = self._server_time_offset_ms
+        if offset is None:
+            offset = self._sync_server_time_offset()
+        return int(time.time() * 1000) + offset
+
+    def _sync_server_time_offset(self) -> int:
+        try:
+            response = requests.get(f"{self.base_url}/api/v3/time", timeout=self.timeout)
             response.raise_for_status()
-            return response.json()
+            server_time = int(response.json().get("serverTime", 0))
+            self._server_time_offset_ms = server_time - int(time.time() * 1000) if server_time else 0
         except Exception:
-            return {}
+            self._server_time_offset_ms = 0
+        return self._server_time_offset_ms
+
+    def _signature(self, query: dict[str, Any]) -> str:
+        return hmac.new(self.api_secret.encode(), urlencode(query).encode(), hashlib.sha256).hexdigest()
+
+    def _debug_template(self) -> dict[str, Any]:
+        return {**self.secrets_status(), "status_code": None, "balances_returned": 0, "non_zero_balances": 0, "error": ""}
+
+    def _safe_error_message(self, payload: Any, status_code: Any) -> str:
+        if isinstance(payload, dict):
+            code = payload.get("code")
+            message = str(payload.get("msg") or "").strip()
+            if code or message:
+                return f"Erreur Binance {status_code or ''} ({code or 'sans code'}): {message or 'requête refusée'}."
+        return f"Erreur Binance {status_code or 'inconnue'}: synchronisation Spot impossible."

@@ -4,6 +4,8 @@ import streamlit as st
 from utils.constants import APP_NAME, APP_SUBTITLE, APP_VERSION
 from utils.helpers import now_utc_label
 
+__all__ = ["render_header"]
+
 
 def render_header() -> None:
     st.markdown(

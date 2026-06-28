@@ -14,15 +14,15 @@ def selected_page() -> str:
         st.session_state[NAV_STATE_KEY] = current_page
 
     selected = st.segmented_control(
-        "Navigation",
-        NAV_ITEMS,
+        label="Navigation",
+        options=NAV_ITEMS,
         selection_mode="single",
         default=current_page,
         key=NAV_STATE_KEY,
         label_visibility="collapsed",
     )
 
-    if selected not in NAV_ITEMS:
+    if not isinstance(selected, str) or selected not in NAV_ITEMS:
         st.session_state[NAV_STATE_KEY] = NAV_ITEMS[0]
         return NAV_ITEMS[0]
 

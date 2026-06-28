@@ -92,6 +92,7 @@ class BinanceService:
             return BinancePortfolioSummary([], 0.0, connected=False, status_message=debug["error"], debug=debug)
 
         debug["balances_returned"] = len(balances_payload)
+        debug["detected_symbols"] = self._first_detected_symbols(balances_payload)
         balances = self._non_zero_balances(balances_payload)
         debug["non_zero_balances"] = len(balances)
 
@@ -128,6 +129,19 @@ class BinanceService:
         status = f"{len(positions)} actifs Spot récupérés depuis Binance · Valeur estimée: {total_value:,.2f} USDT"
         self.last_debug = debug
         return BinancePortfolioSummary(positions, total_value, total_pnl_24h if has_pnl else None, pnl_pct_total, True, status, debug)
+
+    def _first_detected_symbols(self, balances_payload: list[Any]) -> list[str]:
+        symbols: list[str] = []
+        for row in balances_payload:
+            try:
+                asset = str(row.get("asset", "")).upper().strip()
+            except AttributeError:
+                continue
+            if asset:
+                symbols.append(asset)
+            if len(symbols) == 5:
+                break
+        return symbols
 
     def _non_zero_balances(self, balances_payload: list[Any]) -> list[BinanceBalance]:
         balances: list[BinanceBalance] = []
@@ -225,7 +239,7 @@ class BinanceService:
         return hmac.new(self.api_secret.encode(), urlencode(query).encode(), hashlib.sha256).hexdigest()
 
     def _debug_template(self) -> dict[str, Any]:
-        return {**self.secrets_status(), "status_code": None, "balances_returned": 0, "non_zero_balances": 0, "error": ""}
+        return {**self.secrets_status(), "status_code": None, "error": "", "balances_returned": 0, "non_zero_balances": 0, "detected_symbols": []}
 
     def _safe_error_message(self, payload: Any, status_code: Any) -> str:
         if isinstance(payload, dict):

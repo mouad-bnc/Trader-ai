@@ -17,7 +17,7 @@ def render(services: dict[str, object]) -> None:
     st.title("Portefeuille")
 
     if bz.configured:
-        summary = bz.spot_portfolio(cg)
+        summary = bz.account_portfolio(cg)
         if summary.connected:
             _render_binance_portfolio(summary)
         else:
@@ -26,7 +26,7 @@ def render(services: dict[str, object]) -> None:
             _render_binance_debug_panel(summary.debug)
             _render_manual_portfolio(pf.summarize([]), pf)
     else:
-        st.markdown("<div class='card hero'><span class='pill soft'>Binance non configuré</span><p class='muted'>Ajoutez BINANCE_API_KEY et BINANCE_API_SECRET aux secrets Streamlit pour afficher vos vrais soldes Spot en lecture seule.</p></div>", unsafe_allow_html=True)
+        st.markdown("<div class='card hero'><span class='pill soft'>Binance non configuré</span><p class='muted'>Ajoutez BINANCE_API_KEY et BINANCE_API_SECRET aux secrets Streamlit pour synchroniser tous vos comptes Binance en lecture seule.</p></div>", unsafe_allow_html=True)
         empty_state("Aucun portefeuille Binance", "Aucune donnée fictive n’est affichée : connectez Binance en lecture seule pour synchroniser vos avoirs réels.")
         _render_binance_debug_panel(bz.last_debug)
         _render_manual_portfolio(pf.summarize([]), pf)
@@ -49,6 +49,9 @@ def _render_binance_debug_panel(debug: dict[str, object]) -> None:
         st.write(f"Nombre de balances reçues : {debug.get('balances_returned', 0)}")
         st.write(f"Nombre de balances non nulles : {debug.get('non_zero_balances', 0)}")
         st.write(f"5 premiers symboles détectés : {symbols_label}")
+        endpoints = debug.get("endpoints")
+        if isinstance(endpoints, dict) and endpoints:
+            st.write("Endpoints synchronisés :", endpoints)
 
 
 def _render_binance_portfolio(summary: BinancePortfolioSummary) -> None:
@@ -57,37 +60,57 @@ def _render_binance_portfolio(summary: BinancePortfolioSummary) -> None:
     if summary.pnl_24h_usdt is not None and summary.pnl_24h_pct is not None:
         pnl_label = f"P&L 24h estimé {money(summary.pnl_24h_usdt)} · {percent(summary.pnl_24h_pct)}"
 
+    last_sync = summary.last_sync_at.strftime("%d %b %Y · %H:%M UTC") if summary.last_sync_at else "Indisponible"
     st.markdown(
         f"<div class='card hero'><span class='pill'>Binance connecté en lecture seule</span>"
         f"<h2>{money(summary.total_value_usdt, 'USDT')}</h2>"
         f"<p class='{pnl_class}'>{html.escape(pnl_label)}</p>"
         f"<p class='muted'>{html.escape(summary.status_message)}</p>"
-        f"<p class='muted'>Soldes Spot réels · Valorisation publique USDT · Aucun endpoint de trading ou retrait.</p></div>",
+        f"<p class='muted'>Dernière synchronisation: {html.escape(last_sync)}</p>"
+        f"<p class='muted'>Spot · Funding · Earn · Futures · Margin lecture seule · Aucun endpoint de trading, transfert ou retrait.</p></div>",
         unsafe_allow_html=True,
     )
 
+    metric_cols = st.columns(6)
+    metric_cols[0].metric("Total portfolio", money(summary.total_value_usdt, "USDT"))
+    metric_cols[1].metric("Spot", money(summary.spot_value_usdt, "USDT"))
+    metric_cols[2].metric("Futures", money(summary.futures_value_usdt, "USDT"))
+    metric_cols[3].metric("Earn", money(summary.earn_value_usdt, "USDT"))
+    metric_cols[4].metric("Funding", money(summary.funding_value_usdt, "USDT"))
+    metric_cols[5].metric("Assets", str(summary.asset_count))
+
+    if summary.endpoint_warnings:
+        warnings = "".join(f"<li>{html.escape(warning)}</li>" for warning in summary.endpoint_warnings)
+        st.markdown(f"<div class='card'><span class='pill soft'>Synchronisation partielle</span><p class='muted'>Certains endpoints Binance sont indisponibles, les autres soldes restent affichés.</p><ul>{warnings}</ul></div>", unsafe_allow_html=True)
+
     if not summary.positions:
-        empty_state("Synchronisation Binance vide", "Binance est connecté en lecture seule, mais aucun solde non nul n'a été trouvé.")
+        empty_state("Synchronisation Binance vide", "Binance est connecté en lecture seule, mais aucun solde non nul n'a été trouvé sur les endpoints disponibles.")
         _render_binance_debug_panel(summary.debug)
         return
 
-    for pos in summary.positions:
+    st.subheader("Allocation par actif")
+    allocation_bar({position.asset: position.allocation_pct for position in summary.positions})
+
+    st.subheader("Plus grandes positions")
+
+    for pos in summary.positions[:10]:
         pnl_text = "P&L indisponible"
         pnl_class = "muted"
         if pos.pnl_24h_usdt is not None and pos.pnl_24h_pct is not None:
             pnl_class = "positive" if pos.pnl_24h_usdt >= 0 else "negative"
             pnl_text = f"{money(pos.pnl_24h_usdt)} · {percent(pos.pnl_24h_pct)}"
         price_text = money(pos.price_usdt, "USDT") if pos.price_usdt else "Prix USDT indisponible"
+        wallets_text = " · ".join(f"{html.escape(wallet)} {amount:g}" for wallet, amount in sorted(pos.wallet_amounts.items()) if amount > 0)
         st.markdown(
             f"<div class='card'><div class='row'><div>"
             f"<h3>{html.escape(pos.asset)}</h3>"
             f"<p class='muted'>{pos.total:g} {html.escape(pos.asset)} · Libre {pos.free:g} · Bloqué {pos.locked:g}</p>"
+            f"<p class='muted'>{wallets_text}</p>"
             f"<p class='muted'>Prix: {html.escape(price_text)} · Allocation {pos.allocation_pct:.1f}%</p>"
             f"</div><div style='text-align:right'><b>{money(pos.estimated_value_usdt, 'USDT')}</b>"
             f"<p class='{pnl_class}'>{html.escape(pnl_text)}</p></div></div></div>",
             unsafe_allow_html=True,
         )
-    allocation_bar({position.asset: position.allocation_pct for position in summary.positions})
 
 
 def _render_manual_portfolio(summary: PortfolioSummary, pf: PortfolioService) -> None:

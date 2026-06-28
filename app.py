@@ -70,7 +70,10 @@ def main() -> None:
     render_header()
     page = selected_page()
     routes = page_renderers()
-    routes.get(page, routes["Accueil"])(services)
+    try:
+        routes.get(page, routes["Accueil"])(services)
+    except Exception:
+        st.markdown("<div class='card empty'><span class='pill soft'>État sécurisé</span><h3>Page temporairement indisponible</h3><p class='muted'>Une erreur contrôlée est survenue. Réessayez dans quelques instants.</p></div>", unsafe_allow_html=True)
     render_footer()
 
 

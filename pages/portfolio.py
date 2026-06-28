@@ -3,12 +3,12 @@ from __future__ import annotations
 import html
 
 import streamlit as st
-from components.charts import allocation_bar
+from components.charts import allocation_bar, allocation_pie
 from components.cards import empty_state
 from services.binance_service import BinancePortfolioSummary, BinanceService
 from services.coingecko_service import CoinGeckoService
 from services.portfolio_service import PortfolioService, PortfolioSummary
-from utils.helpers import money, percent
+from utils.helpers import clamp, money, percent
 
 
 def render(services: dict[str, object]) -> None:
@@ -90,8 +90,16 @@ def _render_binance_portfolio(summary: BinancePortfolioSummary) -> None:
         _render_binance_debug_panel(summary.debug)
         return
 
+    allocations = {position.asset: position.allocation_pct for position in summary.positions}
+    st.subheader("Intelligence portefeuille")
+    _render_portfolio_intelligence(summary, allocations)
+
     st.subheader("Allocation par actif")
-    allocation_bar({position.asset: position.allocation_pct for position in summary.positions})
+    allocation_bar(allocations)
+    allocation_pie(allocations)
+
+    st.subheader("Insights IA")
+    _render_ai_insights(summary)
 
     st.subheader("Plus grandes positions")
 
@@ -135,3 +143,70 @@ def _render_manual_portfolio(summary: PortfolioSummary, pf: PortfolioService) ->
             unsafe_allow_html=True,
         )
     allocation_bar(pf.allocation(summary))
+
+
+def _performance_label(value_usdt: float | None, value_pct: float | None) -> str:
+    if value_usdt is None or value_pct is None:
+        return "Historique insuffisant pour calculer cette performance."
+    return f"{money(value_usdt, 'USDT')} · {percent(value_pct)}"
+
+
+def _render_portfolio_intelligence(summary: BinancePortfolioSummary, allocations: dict[str, float]) -> None:
+    daily = _performance_label(summary.pnl_24h_usdt, summary.pnl_24h_pct)
+    weekly = "Historique insuffisant pour calculer cette performance."
+    monthly = "Historique insuffisant pour calculer cette performance."
+    performers = [p for p in summary.positions if p.pnl_24h_pct is not None]
+    best = max(performers, key=lambda p: p.pnl_24h_pct or 0, default=None)
+    worst = min(performers, key=lambda p: p.pnl_24h_pct or 0, default=None)
+    best_label = f"{html.escape(best.asset)} · {percent(best.pnl_24h_pct)}" if best else "Historique insuffisant pour calculer cette performance."
+    worst_label = f"{html.escape(worst.asset)} · {percent(worst.pnl_24h_pct)}" if worst else "Historique insuffisant pour calculer cette performance."
+    st.markdown(
+        f"<div class='card'><div class='metric'>"
+        f"<div><span class='muted'>P&L quotidien estimé</span><b>{html.escape(daily)}</b></div>"
+        f"<div><span class='muted'>P&L hebdomadaire estimé</span><b>{html.escape(weekly)}</b></div>"
+        f"<div><span class='muted'>P&L mensuel estimé</span><b>{html.escape(monthly)}</b></div>"
+        f"<div><span class='muted'>Meilleur performer</span><b>{best_label}</b></div>"
+        f"<div><span class='muted'>Pire performer</span><b>{worst_label}</b></div>"
+        f"<div><span class='muted'>Exposition principale</span><b>{html.escape(max(allocations, key=allocations.get) if allocations else 'Indisponible')}</b></div>"
+        f"</div></div>",
+        unsafe_allow_html=True,
+    )
+
+
+def _status_positive(value: float) -> str:
+    if value >= 85: return "Excellent"
+    if value >= 70: return "Bon"
+    if value >= 50: return "Moyen"
+    if value >= 30: return "À surveiller"
+    return "Critique"
+
+
+def _status_risk(value: float) -> str:
+    if value <= 29: return "Faible"
+    if value <= 49: return "Modéré"
+    if value <= 69: return "Élevé"
+    return "Très élevé"
+
+
+def _render_ai_insights(summary: BinancePortfolioSummary) -> None:
+    allocations = [p.allocation_pct for p in summary.positions]
+    largest = max(allocations or [0])
+    diversification = clamp(100 - max(0, largest - 25) * 1.25)
+    health = clamp(58 + (summary.pnl_24h_pct or 0) * 2 + diversification * .25)
+    volatility = clamp(sum(abs(p.pnl_24h_pct or 0) * p.allocation_pct / 100 for p in summary.positions) * 4 + largest * .35)
+    risk_value = clamp(largest * .55 + volatility * .45)
+    exposure = max(summary.positions, key=lambda p: p.allocation_pct, default=None)
+    reduce = "Réduire progressivement la concentration sur l'actif principal." if largest > 50 else "Conserver une exposition équilibrée et surveiller la volatilité."
+    improve = "Renforcer les actifs avec momentum positif confirmé, sans augmenter le risque global."
+    st.markdown(
+        f"<div class='card'><div class='metric'>"
+        f"<div><span class='muted'>Santé du portefeuille</span><b>{health:.0f} % · {_status_positive(health)}</b></div>"
+        f"<div><span class='muted'>Diversification</span><b>{diversification:.0f} % · {_status_positive(diversification)}</b></div>"
+        f"<div><span class='muted'>Risque</span><b>{risk_value:.0f} % · {_status_risk(risk_value)}</b></div>"
+        f"<div><span class='muted'>Volatilité</span><b>{volatility:.0f} % · {_status_risk(volatility)}</b></div>"
+        f"<div><span class='muted'>Exposition principale</span><b>{html.escape(exposure.asset if exposure else 'Indisponible')}</b></div>"
+        f"<div><span class='muted'>Suggestions pour réduire le risque</span><b>{html.escape(reduce)}</b></div>"
+        f"<div><span class='muted'>Suggestions pour améliorer la performance</span><b>{html.escape(improve)}</b></div>"
+        f"</div></div>",
+        unsafe_allow_html=True,
+    )

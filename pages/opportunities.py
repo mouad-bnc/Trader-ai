@@ -97,7 +97,8 @@ def render(services: dict[str, object]) -> None:
         empty_state("Aucune opportunité", "L'analyse reprendra automatiquement lorsque les prix seront disponibles.")
         return
 
-    st.markdown("<div class='card'><span class='pill'>Analyse éducative</span><p class='muted'>Top 3 généré depuis les données marché CoinGecko : score, risque, confiance et recommandation. Ceci n'est pas un conseil financier.</p></div>", unsafe_allow_html=True)
+    st.markdown("<div class='card'><span class='pill'>Opportunity Scanner</span><p class='muted'>Détection éducative : breakouts, survente, momentum fort et anomalies de volume. Ceci n'est pas un conseil financier.</p></div>", unsafe_allow_html=True)
+    _render_scanner(ranked)
     for asset in ranked[:3]:
         ai_score = score(asset)
         asset_risk = risk(asset)
@@ -115,3 +116,36 @@ def render(services: dict[str, object]) -> None:
             f"<div><span class='muted'>Volatilité</span><b>{asset_vol:.1f}%</b></div></div></div>",
             unsafe_allow_html=True,
         )
+
+
+def _scanner_explanation(kind: str, asset: MarketAsset) -> str:
+    if kind == "Breakout candidates":
+        return "Prix proche du haut 24h avec momentum positif."
+    if kind == "Oversold assets":
+        return "Repli marqué pouvant créer une zone de surveillance."
+    if kind == "Strong momentum assets":
+        return "Tendance 24h/7j favorable avec confirmation relative."
+    return "Volume élevé par rapport aux actifs suivis, mouvement à vérifier."
+
+
+def _render_scanner(markets: list[MarketAsset]) -> None:
+    avg_volume = sum(a.total_volume for a in markets) / len(markets) if markets else 0
+    groups = {
+        "Breakout candidates": [a for a in markets if a.high_24h and a.current_price >= a.high_24h * 0.985 and momentum(a) > 0],
+        "Oversold assets": [a for a in markets if a.price_change_24h_pct <= -3 or momentum(a) <= -4],
+        "Strong momentum assets": [a for a in markets if momentum(a) >= 3],
+        "High volume anomalies": [a for a in markets if avg_volume and a.total_volume >= avg_volume * 1.35],
+    }
+    for title, assets in groups.items():
+        cards = []
+        for asset in assets[:3]:
+            conf = confidence(asset)
+            asset_risk = risk(asset)
+            cards.append(
+                f"<div class='mini-item'><div class='row'><div><b>{html.escape(asset.name)}</b>"
+                f"<p class='muted'>{html.escape(_scanner_explanation(title, asset))}</p></div>"
+                f"<div style='text-align:right'><b>Confiance {percent_score(conf)}</b>"
+                f"<p class='muted'>Risque {percent_score(asset_risk)}</p></div></div></div>"
+            )
+        body = "".join(cards) or "<p class='muted'>Aucun actif détecté pour ce filtre.</p>"
+        st.markdown(f"<div class='card'><div class='dashboard-section-title'><h3>{html.escape(title)}</h3></div><div class='mini-list'>{body}</div></div>", unsafe_allow_html=True)

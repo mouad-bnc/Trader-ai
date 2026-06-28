@@ -46,4 +46,4 @@ def render(services: dict[str, object]) -> None:
         lines.append("Les données marché live sont indisponibles; l'analyse reste limitée au portefeuille local et doit être réévaluée quand les API reviennent.")
     lines.append("Ceci est une information éducative, pas un conseil financier.")
     response = " ".join(lines)
-    st.markdown(f"<div class='card hero'><h3>Réponse Mouad Capital AI</h3><p>{html.escape(response)}</p></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='card hero'><h3>Réponse MSH AI-Invest</h3><p>{html.escape(response)}</p></div>", unsafe_allow_html=True)

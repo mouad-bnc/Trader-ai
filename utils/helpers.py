@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from typing import Any
 
 
@@ -38,6 +39,14 @@ def money(value: float | None, currency: str = "USD") -> str:
 
 def percent(value: float | None) -> str:
     return f"{safe_float(value):+.2f}%"
+
+
+def now_casablanca_label() -> str:
+    casablanca = ZoneInfo("Africa/Casablanca")
+    now = datetime.now(casablanca)
+    offset = now.utcoffset()
+    hours = int((offset.total_seconds() if offset else 0) // 3600)
+    return now.strftime(f"%d %b %Y · %H:%M (GMT{hours:+d})")
 
 
 def now_utc_label() -> str:

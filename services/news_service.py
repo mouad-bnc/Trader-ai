@@ -42,4 +42,4 @@ class NewsService:
         return [NewsArticle(title=str(item.get("TITLE", "Actualité crypto")), source=str(item.get("SOURCE_DATA", {}).get("NAME", "CoinDesk")), url=str(item.get("URL", "")), description=str(item.get("BODY", "")), image_url=str(item.get("IMAGE_URL", "")), published_at=str(item.get("PUBLISHED_ON", ""))) for item in data if isinstance(item, dict)]
 
     def _rss_fallback(self, query: str) -> list[NewsArticle]:
-        return [NewsArticle(title="Actualités indisponibles", source="Mouad Capital AI", description=f"Impossible de charger les fournisseurs pour {query}. Réessayez plus tard.", ai_summary="Les marchés restent consultables et l'application continue de fonctionner hors ligne.")]
+        return [NewsArticle(title="Actualités indisponibles", source="MSH AI-Invest", description=f"Impossible de charger les fournisseurs pour {query}. Réessayez plus tard.", ai_summary="Les marchés restent consultables et l'application continue de fonctionner hors ligne.")]

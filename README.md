@@ -1,6 +1,6 @@
-# Mouad Capital AI V2
+# MSH AI-Invest V2
 
-Mouad Capital AI — Your Intelligent Investment Copilot.
+MSH AI-Invest — Your Intelligent Investment Copilot.
 
 Application Streamlit crypto premium, mobile-first, reconstruite from scratch avec une architecture modulaire légère MVC. Le tableau de bord conserve son identité fintech noire et dorée pour fournir une plateforme professionnelle d’intelligence d’investissement.
 
@@ -33,12 +33,12 @@ BINANCE_BASE_URL = "https://api1.binance.com"
 
 ## Branding
 
-- Application name: Mouad Capital AI
+- Application name: MSH AI-Invest
 - Subtitle: Your Intelligent Investment Copilot
-- Home page title: Welcome to Mouad Capital AI
+- Home page title: Welcome to MSH AI-Invest
 - Home page subtitle: Professional investment intelligence platform
-- AI page title: Mouad Capital AI Assistant
-- Footer: © 2026 Mouad Capital AI
+- AI page title: MSH AI-Invest Assistant
+- Footer: © 2026 MSH AI-Invest
 
 ## Validation
 

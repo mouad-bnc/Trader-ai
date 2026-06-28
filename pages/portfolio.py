@@ -74,7 +74,7 @@ def _render_binance_portfolio(summary: BinancePortfolioSummary) -> None:
     )
 
     metric_cols = st.columns(6)
-    metric_cols[0].metric("Total portfolio", money(summary.total_value_usdt, "USDT"))
+    metric_cols[0].metric("Valeur portefeuille", money(summary.total_value_usdt, "USDT"))
     metric_cols[1].metric("Spot", money(summary.spot_value_usdt, "USDT"))
     metric_cols[2].metric("Futures", money(summary.futures_value_usdt, "USDT"))
     metric_cols[3].metric("Earn", money(summary.earn_value_usdt, "USDT"))

@@ -42,6 +42,8 @@ class BinancePortfolioSummary:
     total_value_usdt: float
     pnl_24h_usdt: float | None = None
     pnl_24h_pct: float | None = None
+    connected: bool = False
+    status_message: str = "Connexion Binance indisponible"
 
 
 class BinanceService:
@@ -84,7 +86,24 @@ class BinanceService:
 
     def spot_portfolio(self) -> BinancePortfolioSummary:
         """Return Spot balances enriched with public USDT valuation when available."""
-        balances = self.account_snapshot()
+        if not self.configured:
+            return BinancePortfolioSummary([], 0.0)
+        payload = self._signed_get("/api/v3/account")
+        balances_payload = payload.get("balances", []) if isinstance(payload, dict) else []
+        if not isinstance(balances_payload, list):
+            return BinancePortfolioSummary([], 0.0)
+
+        balances: list[BinanceBalance] = []
+        for row in balances_payload:
+            try:
+                free = safe_float(row.get("free"))
+                locked = safe_float(row.get("locked"))
+                asset = str(row.get("asset", "")).upper().strip()
+                if asset and (free or locked):
+                    balances.append(BinanceBalance(asset, free, locked))
+            except (AttributeError, TypeError, ValueError):
+                continue
+
         tickers = self._ticker_24h_by_symbol() if balances else {}
         positions: list[BinancePortfolioPosition] = []
         total_value = 0.0
@@ -108,7 +127,7 @@ class BinanceService:
         for position in positions:
             position.allocation_pct = (position.estimated_value_usdt / total_value * 100) if total_value else 0.0
         pnl_pct_total = (total_pnl_24h / (total_value - total_pnl_24h) * 100) if has_pnl and (total_value - total_pnl_24h) else None
-        return BinancePortfolioSummary(positions, total_value, total_pnl_24h if has_pnl else None, pnl_pct_total)
+        return BinancePortfolioSummary(positions, total_value, total_pnl_24h if has_pnl else None, pnl_pct_total, True, "Binance connecté en lecture seule")
 
     def _ticker_24h_by_symbol(self) -> dict[str, dict[str, Any]]:
         payload = self._public_get("/api/v3/ticker/24hr")

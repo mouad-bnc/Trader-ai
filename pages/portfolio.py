@@ -18,7 +18,10 @@ def render(services: dict[str, object]) -> None:
 
     if bz.configured:
         summary = bz.spot_portfolio()
-        _render_binance_portfolio(summary)
+        if summary.connected:
+            _render_binance_portfolio(summary)
+        else:
+            st.markdown("<div class='card hero'><span class='pill soft'>Connexion Binance indisponible</span><p class='muted'>Vérifiez les secrets Streamlit BINANCE_API_KEY et BINANCE_API_SECRET. Aucun secret n'est affiché.</p></div>", unsafe_allow_html=True)
     else:
         markets = cg.get_markets()
         summary = pf.summarize(pf.demo_holdings(), markets)
@@ -40,7 +43,7 @@ def _render_binance_portfolio(summary: BinancePortfolioSummary) -> None:
     )
 
     if not summary.positions:
-        empty_state("Synchronisation Binance vide", "La connexion en lecture seule n'a retourné aucun solde Spot exploitable.")
+        empty_state("Aucun solde Spot", "Binance est connecté en lecture seule, mais aucun solde non nul n'a été trouvé.")
         return
 
     for pos in summary.positions:

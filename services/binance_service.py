@@ -9,6 +9,8 @@ from urllib.parse import urlencode
 
 import requests
 
+from utils.helpers import safe_float
+
 
 @dataclass(slots=True)
 class BinanceBalance:
@@ -16,11 +18,45 @@ class BinanceBalance:
     free: float
     locked: float
 
+    @property
+    def total(self) -> float:
+        return self.free + self.locked
+
+
+@dataclass(slots=True)
+class BinancePortfolioPosition:
+    asset: str
+    free: float
+    locked: float
+    total: float
+    price_usdt: float
+    estimated_value_usdt: float
+    allocation_pct: float = 0.0
+    pnl_24h_usdt: float | None = None
+    pnl_24h_pct: float | None = None
+
+
+@dataclass(slots=True)
+class BinancePortfolioSummary:
+    positions: list[BinancePortfolioPosition]
+    total_value_usdt: float
+    pnl_24h_usdt: float | None = None
+    pnl_24h_pct: float | None = None
+
 
 class BinanceService:
+    """Read-only Binance Spot account integration.
+
+    This service only calls the signed Spot account information endpoint and
+    public market-data endpoints. It does not implement trading, transfer, or
+    withdrawal endpoints.
+    """
+
+    STABLE_USDT_PRICES = {"USDT": 1.0, "USDC": 1.0, "BUSD": 1.0, "FDUSD": 1.0, "TUSD": 1.0, "DAI": 1.0}
+
     def __init__(self, api_key: str | None = None, api_secret: str | None = None, base_url: str = "https://api.binance.com", timeout: int = 8) -> None:
-        self.api_key = api_key or ""
-        self.api_secret = api_secret or ""
+        self.api_key = (api_key or "").strip()
+        self.api_secret = (api_secret or "").strip()
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
 
@@ -29,6 +65,7 @@ class BinanceService:
         return bool(self.api_key and self.api_secret)
 
     def account_snapshot(self) -> list[BinanceBalance]:
+        """Return non-zero Spot balances from Binance account information."""
         if not self.configured:
             return []
         payload = self._signed_get("/api/v3/account")
@@ -36,19 +73,72 @@ class BinanceService:
         result: list[BinanceBalance] = []
         for row in balances:
             try:
-                free = float(row.get("free", 0) or 0)
-                locked = float(row.get("locked", 0) or 0)
-                if free or locked:
-                    result.append(BinanceBalance(str(row.get("asset", "")), free, locked))
-            except (TypeError, ValueError):
+                free = safe_float(row.get("free"))
+                locked = safe_float(row.get("locked"))
+                asset = str(row.get("asset", "")).upper().strip()
+                if asset and (free or locked):
+                    result.append(BinanceBalance(asset, free, locked))
+            except (AttributeError, TypeError, ValueError):
                 continue
         return result
 
-    def trade_history(self, symbol: str | None = None) -> list[dict[str, Any]]:
-        if not self.configured or not symbol:
-            return []
-        payload = self._signed_get("/api/v3/myTrades", {"symbol": symbol.upper(), "limit": 50})
-        return payload if isinstance(payload, list) else []
+    def spot_portfolio(self) -> BinancePortfolioSummary:
+        """Return Spot balances enriched with public USDT valuation when available."""
+        balances = self.account_snapshot()
+        tickers = self._ticker_24h_by_symbol() if balances else {}
+        positions: list[BinancePortfolioPosition] = []
+        total_value = 0.0
+        total_pnl_24h = 0.0
+        has_pnl = False
+
+        for balance in balances:
+            price = self._price_usdt(balance.asset, tickers)
+            value = balance.total * price if price else 0.0
+            pnl_pct = self._pnl_pct_24h(balance.asset, tickers)
+            pnl_value = None
+            if value and pnl_pct is not None:
+                previous_value = value / (1 + (pnl_pct / 100)) if pnl_pct > -100 else 0.0
+                pnl_value = value - previous_value
+                total_pnl_24h += pnl_value
+                has_pnl = True
+            total_value += value
+            positions.append(BinancePortfolioPosition(balance.asset, balance.free, balance.locked, balance.total, price, value, pnl_24h_usdt=pnl_value, pnl_24h_pct=pnl_pct))
+
+        positions.sort(key=lambda position: position.estimated_value_usdt, reverse=True)
+        for position in positions:
+            position.allocation_pct = (position.estimated_value_usdt / total_value * 100) if total_value else 0.0
+        pnl_pct_total = (total_pnl_24h / (total_value - total_pnl_24h) * 100) if has_pnl and (total_value - total_pnl_24h) else None
+        return BinancePortfolioSummary(positions, total_value, total_pnl_24h if has_pnl else None, pnl_pct_total)
+
+    def _ticker_24h_by_symbol(self) -> dict[str, dict[str, Any]]:
+        payload = self._public_get("/api/v3/ticker/24hr")
+        if not isinstance(payload, list):
+            return {}
+        return {str(item.get("symbol", "")).upper(): item for item in payload if isinstance(item, dict)}
+
+    def _price_usdt(self, asset: str, tickers: dict[str, dict[str, Any]]) -> float:
+        asset = asset.upper()
+        if asset in self.STABLE_USDT_PRICES:
+            return self.STABLE_USDT_PRICES[asset]
+        ticker = tickers.get(f"{asset}USDT")
+        return safe_float(ticker.get("lastPrice")) if ticker else 0.0
+
+    def _pnl_pct_24h(self, asset: str, tickers: dict[str, dict[str, Any]]) -> float | None:
+        asset = asset.upper()
+        if asset in self.STABLE_USDT_PRICES:
+            return 0.0
+        ticker = tickers.get(f"{asset}USDT")
+        if not ticker:
+            return None
+        return safe_float(ticker.get("priceChangePercent"))
+
+    def _public_get(self, path: str, params: dict[str, Any] | None = None) -> Any:
+        try:
+            response = requests.get(f"{self.base_url}{path}", params=params or {}, timeout=self.timeout)
+            response.raise_for_status()
+            return response.json()
+        except Exception:
+            return None
 
     def _signed_get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         query = {**(params or {}), "timestamp": int(time.time() * 1000)}

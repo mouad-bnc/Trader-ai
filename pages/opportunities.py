@@ -184,8 +184,23 @@ def render(services: dict[str, object]) -> None:
         asset_momentum = momentum(asset)
         bias = recommendation(ai_score, asset_risk, confidence_score)
         why = "".join(f"<li>{html.escape(point)}</li>" for point in _why_points(asset, asset_risk)[:4])
+        mobile_reason = _why_points(asset, asset_risk)[0]
+        mobile_target = "—"
+        if asset.current_price > 0 and asset.high_24h > 0:
+            mobile_target = money(max(asset.high_24h, asset.current_price * (1 + ai_score / 1000)))
         st.markdown(
-            f"<article class='card opportunity-card compact-card'><div class='opportunity-head'>"
+            f"<article class='card opportunity-card compact-card mobile-decision-card'>"
+            f"<div class='mobile-opportunity-row'><div><h3>{html.escape(asset.symbol)} · {html.escape(asset.name)}</h3></div>"
+            f"<div class='mobile-price'>{money(asset.current_price)}</div></div>"
+            f"<div class='mobile-status-row'><span class='mobile-status-pill'>{html.escape(bias)}</span>"
+            f"<span class='mobile-potential'>Potentiel <b>{percent_score(ai_score)}</b></span></div>"
+            f"<div class='mobile-metric-row'>"
+            f"<span class='mobile-metric-chip'>Risque <b>{percent_score(asset_risk)}</b></span>"
+            f"<span class='mobile-metric-chip'>Confiance <b>{percent_score(confidence_score)}</b></span>"
+            f"<span class='mobile-metric-chip'>Momentum <b>{percent(asset_momentum)}</b></span></div>"
+            f"<p class='mobile-reason'>{html.escape(mobile_reason)}</p>"
+            f"<p class='mobile-target'>Cible : <b>{html.escape(mobile_target)}</b></p>"
+            f"<div class='opportunity-head'>"
             f"<div><span class='pill soft'>{html.escape(bias)}</span><h3>{html.escape(asset.name)}</h3>"
             f"<p class='muted'>{html.escape(asset.symbol)} · {money(asset.current_price)}</p></div>"
             f"<div class='opportunity-price'><b>{percent_score(ai_score)}</b><span>Potentiel IA</span></div></div>"
@@ -226,9 +241,9 @@ def _render_scanner(markets: list[MarketAsset]) -> None:
             conf = confidence(asset)
             asset_risk = risk(asset)
             cards.append(
-                f"<div class='mini-item'><div class='row'><div><b>{html.escape(asset.name)}</b>"
+                f"<div class='mini-item scanner-row'><div class='row'><div class='scanner-main'><b>{html.escape(asset.name)}</b>"
                 f"<p class='muted'>{html.escape(_scanner_explanation(title, asset))}</p></div>"
-                f"<div style='text-align:right'><b>Confiance {percent_score(conf)}</b>"
+                f"<div class='scanner-metrics'><b>Confiance {percent_score(conf)}</b>"
                 f"<p class='muted'>Risque {percent_score(asset_risk)}</p></div></div></div>"
             )
         body = "".join(cards) or "<p class='muted'>Aucun actif détecté pour ce filtre.</p>"

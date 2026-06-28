@@ -49,6 +49,8 @@ def render(services: dict[str, object]) -> None:
     binance_summary = bz.spot_portfolio(cg) if bz.configured else None
     has_binance_positions = bool(binance_summary and binance_summary.connected and binance_summary.positions)
     portfolio_label = money(binance_summary.total_value_usdt, "USDT") if has_binance_positions else "Indisponible"
+    daily_pnl = binance_summary.pnl_24h_usdt if has_binance_positions and binance_summary and binance_summary.pnl_24h_usdt else 0
+    daily_pnl_class = "positive" if daily_pnl >= 0 else "negative"
     portfolio_message = "Total réel Binance Spot" if has_binance_positions else "Connectez Binance en lecture seule ou vérifiez que votre portefeuille Spot contient des actifs."
     avg_24h = sum(asset.price_change_24h_pct for asset in markets) / len(markets) if markets else 0
     best_asset = max(markets, key=lambda asset: asset.price_change_24h_pct) if markets else None
@@ -76,10 +78,9 @@ def render(services: dict[str, object]) -> None:
         <div class='dashboard-grid'>
             <section class='card dashboard-span-3 compact-card'>
                 <div class='dashboard-section-title'><div><span class='pill'>Vue rapide</span><h3>Essentiel du jour</h3></div></div>
-                <div class='metric'>
+                <div class='metric desktop-kpi-row'>
                     <div><span class='muted'>Valeur portefeuille</span><b>{portfolio_label}</b></div>
-                    <div><span class='muted'>Gain du jour</span><b class='positive'>{money(max(binance_summary.pnl_24h_usdt if has_binance_positions and binance_summary and binance_summary.pnl_24h_usdt else 0, 0), 'USDT')}</b></div>
-                    <div><span class='muted'>Perte du jour</span><b class='negative'>{money(min(binance_summary.pnl_24h_usdt if has_binance_positions and binance_summary and binance_summary.pnl_24h_usdt else 0, 0), 'USDT')}</b></div>
+                    <div><span class='muted'>Daily P&L</span><b class='{daily_pnl_class}'>{money(daily_pnl, 'USDT')}</b></div>
                     <div><span class='muted'>Opportunités actives</span><b>{len(ranked_opportunities)}</b></div>
                     <div><span class='muted'>Statut marché</span><b class='{market_class}'>{percent(avg_24h)}</b></div>
                 </div>
@@ -97,9 +98,9 @@ def render(services: dict[str, object]) -> None:
                 <p class='muted'>Analyse en français, éducative uniquement, basée sur le portefeuille et les marchés chargés.</p>
                 <div class='mini-item'><b>Signal à surveiller</b><p class='muted'>{html.escape(best_label)}</p></div>
             </section>
-            <section class='card'>
+            <section class='card dashboard-span-3'>
                 <div class='dashboard-section-title'><div><span class='pill'>Marchés</span><h3>Cartes live</h3></div><b class='{market_class}'>{percent(avg_24h)}</b></div>
-                <div class='mini-list'>{market_cards}</div>
+                <div class='mini-list desktop-grid-3'>{market_cards}</div>
             </section>
             <section class='card dashboard-span-3'>
                 <div class='dashboard-section-title'><div><span class='pill'>Vue marché</span><h3>Marché crypto global</h3></div></div>
@@ -115,7 +116,7 @@ def render(services: dict[str, object]) -> None:
             </section>
             <section class='card dashboard-span-2'>
                 <div class='dashboard-section-title'><div><span class='pill'>Opportunités</span><h3>Top éducatif</h3></div><span class='muted'>Potentiel IA · risque · confiance</span></div>
-                <div class='mini-list'>{opportunity_cards}</div>
+                <div class='mini-list desktop-grid-3'>{opportunity_cards}</div>
             </section>
         </div>
         """,

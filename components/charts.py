@@ -46,4 +46,4 @@ def range_chart(title: str, values: list[float], range_label: str) -> None:
         st.markdown(f"<div class='card empty'><span class='pill soft'>{html.escape(range_label)}</span><h3>{html.escape(title)}</h3><p class='muted'>Données insuffisantes pour afficher ce graphique.</p></div>", unsafe_allow_html=True)
         return
     positive = values[-1] >= values[0]
-    st.markdown(f"<div class='card'><div class='row'><h3>{html.escape(title)}</h3><span class='pill soft'>{html.escape(range_label)}</span></div>{sparkline(values, positive)}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='card compact-chart compact-card'><div class='row'><h3>{html.escape(title)}</h3><span class='pill soft'>{html.escape(range_label)}</span></div>{sparkline(values, positive)}</div>", unsafe_allow_html=True)

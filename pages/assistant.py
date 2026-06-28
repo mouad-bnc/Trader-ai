@@ -1,25 +1,48 @@
 from __future__ import annotations
+
+import html
+
 import streamlit as st
+
+from services.binance_service import BinanceService
 from services.coingecko_service import CoinGeckoService
 from services.portfolio_service import PortfolioService
 from utils.helpers import money, percent
 
 
 def render(services: dict[str, object]) -> None:
-    cg = services["coingecko"]; pf = services["portfolio"]
+    cg = services["coingecko"]
+    pf = services["portfolio"]
+    bz = services.get("binance")
     assert isinstance(cg, CoinGeckoService) and isinstance(pf, PortfolioService)
     st.title("Trader IA")
     markets = cg.get_markets()
+    binance_summary = bz.spot_portfolio() if isinstance(bz, BinanceService) and bz.configured else None
     summary = pf.summarize(pf.demo_holdings(), markets)
-    st.markdown("<div class='card'><span class='pill'>Assistant contextuel</span><p class='muted'>Posez une question sur le portefeuille, le marché ou le risque. Les réponses restent éducatives.</p></div>", unsafe_allow_html=True)
-    prompt = st.text_input("Votre question", placeholder="Analyse mon portefeuille")
+    portfolio_value = binance_summary.total_value_usdt if binance_summary and binance_summary.connected and binance_summary.positions else summary.total_value
+    positions_count = len(binance_summary.positions) if binance_summary and binance_summary.connected else len(summary.positions)
+
+    st.markdown("<div class='card'><span class='pill'>Assistant contextuel</span><p class='muted'>Réponses en français, éducatives uniquement, basées sur le portefeuille disponible et les données marché chargées.</p></div>", unsafe_allow_html=True)
+    prompt = st.text_input("Votre question", placeholder="Analyse mon portefeuille et le risque actuel")
     if not prompt:
         st.markdown("<div class='card'><b>Suggestions rapides</b><p class='muted'>Analyse portefeuille · Risque BTC · Opportunités · Résumé marché</p></div>", unsafe_allow_html=True)
         return
-    response = f"Portefeuille estimé à {money(summary.total_value)} avec un PnL de {percent(summary.pnl_pct)}. "
+
+    prompt_l = prompt.lower()
+    lines = [f"Ton portefeuille suivi vaut environ {money(portfolio_value)} sur {positions_count} position(s)."]
     if markets:
         best = max(markets, key=lambda a: a.price_change_24h_pct)
-        response += f"Le meilleur momentum 24h de la watchlist est {best.name} ({percent(best.price_change_24h_pct)})."
+        weakest = min(markets, key=lambda a: a.price_change_24h_pct)
+        avg_24h = sum(a.price_change_24h_pct for a in markets) / len(markets)
+        lines.append(f"La watchlist montre une moyenne 24h de {percent(avg_24h)}. Meilleur momentum: {best.name} ({percent(best.price_change_24h_pct)}). Plus faible: {weakest.name} ({percent(weakest.price_change_24h_pct)}).")
+        if "risque" in prompt_l or "risk" in prompt_l:
+            lines.append("Réduis le risque avec une taille de position maîtrisée, une diversification raisonnable et un plan écrit avant toute décision.")
+        elif "opportun" in prompt_l:
+            lines.append(f"À surveiller en priorité: {best.name}, mais attends une confirmation de tendance et un ratio rendement/risque cohérent.")
+        else:
+            lines.append("Le contexte favorise une lecture graduelle: tendance, volume, volatilité, puis allocation. Aucune action automatique n'est recommandée.")
     else:
-        response += "Les données marché live sont indisponibles, donc l'analyse se limite aux positions locales."
-    st.markdown(f"<div class='card hero'><h3>Réponse Trader AI</h3><p>{response}</p></div>", unsafe_allow_html=True)
+        lines.append("Les données marché live sont indisponibles; l'analyse reste limitée au portefeuille local et doit être réévaluée quand les API reviennent.")
+    lines.append("Ceci est une information éducative, pas un conseil financier.")
+    response = " ".join(lines)
+    st.markdown(f"<div class='card hero'><h3>Réponse Trader AI</h3><p>{html.escape(response)}</p></div>", unsafe_allow_html=True)

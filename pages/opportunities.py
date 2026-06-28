@@ -78,13 +78,56 @@ def indicator(label: str, value: float, *, risk_indicator: bool = False) -> str:
 
 
 def recommendation(ai_score: float, asset_risk: float, confidence_score: float) -> str:
+    if asset_risk >= 70:
+        return "Risque élevé"
     if confidence_score < 55:
-        return "Surveiller : données encore limitées"
+        return "À surveiller"
     if ai_score >= 70 and asset_risk < 50:
-        return "Accumulation prudente"
-    if ai_score >= 55 and asset_risk < 70:
-        return "Observer et attendre un bon point d’entrée"
+        return "Opportunité IA"
     return "Attendre confirmation"
+
+
+def _compact_metric(label: str, value: float, *, risk_indicator: bool = False, display: str | None = None) -> str:
+    status, status_class, _ = risk_status(value) if risk_indicator else positive_status(value)
+    shown = display or percent_score(value)
+    return (
+        "<div class='metric-chip'>"
+        f"<span>{html.escape(label)}</span><b class='{status_class}'>{html.escape(shown)}</b>"
+        f"<small>{html.escape(status)}</small>"
+        "</div>"
+    )
+
+
+def _why_points(asset: MarketAsset, asset_risk: float) -> list[str]:
+    mom = momentum(asset)
+    avg_price = (asset.high_24h + asset.low_24h) / 2 if asset.high_24h and asset.low_24h else asset.current_price
+    volume_label = "Volume élevé" if asset.total_volume and asset.market_cap and asset.total_volume >= asset.market_cap * 0.03 else "Volume à confirmer"
+    trend = "Tendance confirmée" if mom > 1 and asset.current_price >= avg_price else "Tendance non confirmée"
+    risk_label, _, _ = risk_status(asset_risk)
+    return [
+        f"Momentum {'positif' if mom >= 0 else 'négatif'} sur les données 24h/7j.",
+        f"{volume_label} par rapport aux données disponibles.",
+        f"{trend} par le positionnement du prix.",
+        f"Risque {risk_label.lower()} selon volatilité et momentum.",
+    ]
+
+
+def _target_section(asset: MarketAsset, ai_score: float) -> str:
+    if asset.current_price <= 0 or asset.high_24h <= 0 or asset.low_24h <= 0:
+        return "<div class='target-grid'><p class='muted'>Objectif indisponible pour le moment.</p></div>"
+    entry = asset.low_24h + (asset.high_24h - asset.low_24h) * 0.35
+    objective = max(asset.high_24h, asset.current_price * (1 + ai_score / 1000))
+    potential = ((objective - asset.current_price) / asset.current_price) * 100 if asset.current_price else 0
+    horizon = "Court terme" if abs(momentum(asset)) >= 3 else "À confirmer"
+    return (
+        "<div class='target-grid'>"
+        f"<div><span class='muted'>Prix actuel</span><b>{money(asset.current_price)}</b></div>"
+        f"<div><span class='muted'>Entrée idéale</span><b>{money(entry)}</b></div>"
+        f"<div><span class='muted'>Objectif IA</span><b>{money(objective)}</b></div>"
+        f"<div><span class='muted'>Potentiel estimé</span><b>{percent(potential)}</b></div>"
+        f"<div><span class='muted'>Horizon</span><b>{html.escape(horizon)}</b></div>"
+        "</div>"
+    )
 
 
 def render(services: dict[str, object]) -> None:
@@ -97,33 +140,40 @@ def render(services: dict[str, object]) -> None:
         empty_state("Aucune opportunité", "L'analyse reprendra automatiquement lorsque les prix seront disponibles.")
         return
 
-    st.markdown("<div class='card'><span class='pill'>Opportunity Scanner</span><p class='muted'>Détection éducative : breakouts, survente, momentum fort et anomalies de volume. Ceci n'est pas un conseil financier.</p></div>", unsafe_allow_html=True)
+    st.markdown("<div class='card compact-card'><span class='pill'>Scanner IA</span><p class='muted'>Détection éducative compacte : breakouts, survente, momentum fort et anomalies de volume. Ceci n'est pas un conseil financier.</p></div>", unsafe_allow_html=True)
     _render_scanner(ranked)
     for asset in ranked[:3]:
         ai_score = score(asset)
         asset_risk = risk(asset)
         asset_vol = volatility(asset)
         confidence_score = confidence(asset)
+        asset_momentum = momentum(asset)
         bias = recommendation(ai_score, asset_risk, confidence_score)
+        why = "".join(f"<li>{html.escape(point)}</li>" for point in _why_points(asset, asset_risk)[:4])
         st.markdown(
-            f"<div class='card'><div class='row'><div><h3>{html.escape(asset.name)}</h3>"
-            f"<p class='muted'>{html.escape(asset.symbol)} · {html.escape(bias)}</p></div>"
-            f"<div style='text-align:right'><b>{percent_score(ai_score)}</b><p class='muted'>{money(asset.current_price)}</p></div></div>"
-            f"<div class='metric'>{indicator('Score', ai_score)}"
-            f"{indicator('Risque', asset_risk, risk_indicator=True)}"
-            f"{indicator('Confiance', confidence_score)}"
-            f"<div><span class='muted'>Momentum</span><b class='{ 'positive' if momentum(asset) >= 0 else 'negative' }'>{percent(momentum(asset))}</b></div>"
-            f"<div><span class='muted'>Volatilité</span><b>{asset_vol:.1f}%</b></div></div></div>",
+            f"<article class='card opportunity-card compact-card'><div class='opportunity-head'>"
+            f"<div><span class='pill soft'>{html.escape(bias)}</span><h3>{html.escape(asset.name)}</h3>"
+            f"<p class='muted'>{html.escape(asset.symbol)} · {money(asset.current_price)}</p></div>"
+            f"<div class='opportunity-price'><b>{percent_score(ai_score)}</b><span>Potentiel IA</span></div></div>"
+            f"<div class='metric-chips'>"
+            f"{_compact_metric('Potentiel IA', ai_score)}"
+            f"{_compact_metric('Risque', asset_risk, risk_indicator=True)}"
+            f"{_compact_metric('Confiance', confidence_score)}"
+            f"{_compact_metric('Momentum', clamp(asset_momentum, 0, 100), display=percent(asset_momentum))}"
+            f"{_compact_metric('Volatilité', clamp(asset_vol, 0, 100), risk_indicator=True)}"
+            f"</div>"
+            f"<div class='thin-bars'>{indicator('Potentiel IA', ai_score)}{indicator('Confiance', confidence_score)}{indicator('Risque', asset_risk, risk_indicator=True)}</div>"
+            f"<div class='opportunity-details'><div><h4>Pourquoi ?</h4><ul>{why}</ul></div>"
+            f"<div><h4>Cibles</h4>{_target_section(asset, ai_score)}</div></div></article>",
             unsafe_allow_html=True,
         )
 
-
 def _scanner_explanation(kind: str, asset: MarketAsset) -> str:
-    if kind == "Breakout candidates":
+    if kind == "Breakouts à surveiller":
         return "Prix proche du haut 24h avec momentum positif."
-    if kind == "Oversold assets":
+    if kind == "Actifs survendus":
         return "Repli marqué pouvant créer une zone de surveillance."
-    if kind == "Strong momentum assets":
+    if kind == "Momentum fort":
         return "Tendance 24h/7j favorable avec confirmation relative."
     return "Volume élevé par rapport aux actifs suivis, mouvement à vérifier."
 
@@ -131,10 +181,10 @@ def _scanner_explanation(kind: str, asset: MarketAsset) -> str:
 def _render_scanner(markets: list[MarketAsset]) -> None:
     avg_volume = sum(a.total_volume for a in markets) / len(markets) if markets else 0
     groups = {
-        "Breakout candidates": [a for a in markets if a.high_24h and a.current_price >= a.high_24h * 0.985 and momentum(a) > 0],
-        "Oversold assets": [a for a in markets if a.price_change_24h_pct <= -3 or momentum(a) <= -4],
-        "Strong momentum assets": [a for a in markets if momentum(a) >= 3],
-        "High volume anomalies": [a for a in markets if avg_volume and a.total_volume >= avg_volume * 1.35],
+        "Breakouts à surveiller": [a for a in markets if a.high_24h and a.current_price >= a.high_24h * 0.985 and momentum(a) > 0],
+        "Actifs survendus": [a for a in markets if a.price_change_24h_pct <= -3 or momentum(a) <= -4],
+        "Momentum fort": [a for a in markets if momentum(a) >= 3],
+        "Volumes inhabituels": [a for a in markets if avg_volume and a.total_volume >= avg_volume * 1.35],
     }
     for title, assets in groups.items():
         cards = []

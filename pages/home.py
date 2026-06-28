@@ -4,7 +4,7 @@ import html
 
 import streamlit as st
 from components.cards import empty_state
-from pages.opportunities import confidence, recommendation, risk, score
+from pages.opportunities import confidence, indicator, percent_score, recommendation, risk, risk_status, score
 from services.binance_service import BinanceService
 from services.coingecko_service import CoinGeckoService, MarketAsset
 from utils.constants import APP_SUBTITLE, HOME_SUBTITLE, HOME_TITLE
@@ -26,12 +26,15 @@ def _opportunity_item(asset: MarketAsset) -> str:
     ai_score = score(asset)
     asset_risk = risk(asset)
     confidence_score = confidence(asset)
+    risk_label, risk_class, _ = risk_status(asset_risk)
     return (
         "<div class='mini-item'>"
         "<div class='row'>"
         f"<div><b>{html.escape(asset.name)}</b><p class='muted'>{html.escape(recommendation(ai_score, asset_risk, confidence_score))}</p></div>"
-        f"<div style='text-align:right'><b>{ai_score:.0f}/100</b><p class='muted'>Risque {asset_risk:.0f}/100</p></div>"
-        "</div></div>"
+        f"<div style='text-align:right'><b>{percent_score(ai_score)}</b><p class='muted'>Risque : <span class='{risk_class}'>{percent_score(asset_risk)} · {html.escape(risk_label)}</span></p></div>"
+        "</div>"
+        f"{indicator('Score', ai_score)}"
+        "</div>"
     )
 
 

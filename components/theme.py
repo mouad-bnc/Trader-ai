@@ -62,6 +62,24 @@ h1,h2,h3,p{margin-top:0}h1,h2,h3,[data-testid="stMarkdownContainer"] h1,[data-te
 }
 @media(max-width:410px){.scanner-row .row{grid-template-columns:1fr}.scanner-metrics{display:flex;gap:.5rem;text-align:left;min-width:0}.cockpit-table td:nth-child(5){transform:none;grid-column:1 / -1;padding-left:31%!important}.mobile-status-pill{max-width:58%}}
 
+
+/* Compact Marchés cards on phones: keep desktop cockpit unchanged. */
+@media(max-width:767px){
+  .market-grid{gap:.48rem!important}
+  .market-card.card,.market-card.compact-card{max-height:220px!important;min-height:0!important;padding:10px!important;margin:0!important;overflow:hidden;border-radius:16px!important}
+  .market-card>.row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:.48rem!important}
+  .market-card>.row>.row{display:grid;grid-template-columns:28px minmax(0,1fr);gap:.42rem!important;align-items:center}
+  .market-card .logo{width:28px!important;height:28px!important;flex-basis:28px!important;font-size:.62rem;padding:0!important;justify-content:center}
+  .market-card h3{font-size:.98rem!important;line-height:1.06!important;margin:0 0 .08rem!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .market-card p{margin:0!important}.market-card .muted{font-size:.68rem!important;line-height:1.18!important}
+  .market-card>.row>div:last-child{white-space:nowrap;text-align:right}.market-card>.row>div:last-child b{font-size:.9rem!important;line-height:1.1}.market-card>.row>div:last-child p{font-size:.72rem!important;line-height:1.1}
+  .market-card .spark{height:60px!important;max-height:64px!important;margin:.34rem 0!important}
+  .market-card .metric{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:.28rem!important}
+  .market-card .metric div{padding:.34rem .32rem!important;border-radius:11px!important;min-height:42px!important}
+  .market-card .metric span{font-size:.58rem!important;line-height:1.08!important;white-space:nowrap}.market-card .metric b{font-size:.68rem!important;line-height:1.1!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+}
+@media(max-width:410px){.market-card.card,.market-card.compact-card{max-height:205px!important}.market-card .spark{height:55px!important;max-height:58px!important}.market-card .metric b{font-size:.64rem!important}}
+
 </style>""",
         unsafe_allow_html=True,
     )

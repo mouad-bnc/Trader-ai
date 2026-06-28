@@ -81,24 +81,6 @@ h1,h2,h3,p{margin-top:0}h1,h2,h3,[data-testid="stMarkdownContainer"] h1,[data-te
 @media(max-width:410px){.market-card.card,.market-card.compact-card{max-height:205px!important}.market-card .spark{height:55px!important;max-height:58px!important}.market-card .metric b{font-size:.64rem!important}}
 
 
-/* Home trading cockpit: dense responsive decision grid */
-.home-cockpit{width:100%;max-width:1800px;margin:0 auto;display:grid;gap:.5rem}
-.home-cockpit-head{display:grid;grid-template-columns:minmax(0,1fr);gap:.25rem;border:1px solid var(--line);border-radius:14px;background:linear-gradient(145deg,rgba(212,175,55,.10),rgba(255,255,255,.018)),rgba(17,17,19,.90);padding:.58rem .65rem;box-shadow:0 12px 32px rgba(0,0,0,.28)}
-.home-cockpit-head h1{font-size:clamp(1.05rem,2.4vw,1.55rem)!important;line-height:1!important;margin:.22rem 0 0!important}
-.home-cockpit-head .muted{font-size:.7rem;line-height:1.28;margin:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.home-kpi-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.42rem}
-.home-kpi{min-width:0;min-height:86px;max-height:110px;display:grid;align-content:space-between;gap:.14rem;border:1px solid var(--line);border-radius:13px;background:linear-gradient(145deg,rgba(255,255,255,.058),rgba(255,255,255,.014)),rgba(17,17,19,.93);padding:.52rem .56rem;box-shadow:0 10px 26px rgba(0,0,0,.24);overflow:hidden}
-.home-kpi span,.home-kpi small{display:block;color:var(--muted);font-size:.61rem;line-height:1.14;font-weight:800;letter-spacing:.01em}
-.home-kpi b{display:block;color:var(--text);font-size:clamp(.82rem,2.9vw,1rem);line-height:1.02;font-weight:950;letter-spacing:-.035em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.home-kpi small{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-weight:650}
-.home-watch-card{border:1px solid var(--line);border-radius:14px;background:linear-gradient(145deg,rgba(255,255,255,.052),rgba(255,255,255,.014)),rgba(17,17,19,.92);padding:.54rem .58rem;box-shadow:0 12px 32px rgba(0,0,0,.28);overflow:hidden}
-.home-watch-title{display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem;margin-bottom:.34rem}.home-watch-title h3{font-size:.9rem!important;margin:.18rem 0 0!important;line-height:1}.home-watch-title .pill{font-size:.58rem;padding:.18rem .42rem}.home-watch-title>b{font-size:.82rem;white-space:nowrap}
-.home-watch-head,.home-watch-row{display:grid;grid-template-columns:.36rem .82fr 1.12fr .74fr .82fr .72fr;align-items:center;gap:.32rem}.home-watch-head{color:var(--muted);font-size:.55rem;text-transform:uppercase;letter-spacing:.035em;font-weight:950;padding:0 .22rem .2rem}.home-watch-list{display:grid;gap:.25rem}.home-watch-row{min-height:34px;border:1px solid var(--line-soft);border-radius:10px;background:rgba(0,0,0,.22);padding:.32rem .24rem;font-size:.68rem;line-height:1.05}.home-watch-row b{font-size:.74rem}.home-watch-row span:not(.status-dot){white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}.home-watch-row b{text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.status-dot{width:.42rem;height:.42rem;border-radius:50%;display:inline-block;box-shadow:0 0 12px currentColor}.dot-buy{color:var(--green)}.dot-wait{color:var(--yellow)}.dot-sell{color:var(--red)}.home-signal{font-weight:950}.home-signal.dot-buy{color:var(--green)}.home-signal.dot-wait{color:var(--yellow)}.home-signal.dot-sell{color:var(--red)}
-@media(max-width:390px){.home-kpi{min-height:80px;padding:.46rem}.home-kpi b{font-size:.78rem}.home-kpi span,.home-kpi small{font-size:.56rem}.home-watch-head,.home-watch-row{grid-template-columns:.34rem .72fr 1fr .66fr .72fr .66fr;gap:.24rem}.home-watch-row{font-size:.62rem}.home-watch-row b{font-size:.68rem}}
-@media(min-width:768px){.home-cockpit{gap:.62rem}.home-cockpit-head{grid-template-columns:minmax(0,.75fr) minmax(0,1.25fr);align-items:center;padding:.7rem .8rem}.home-cockpit-head .muted{font-size:.78rem;-webkit-line-clamp:3}.home-kpi-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:.55rem}.home-kpi{min-height:92px}.home-watch-card{padding:.68rem}.home-watch-row{min-height:38px;font-size:.75rem}.home-watch-row b{font-size:.82rem}.home-watch-head{font-size:.62rem}}
-@media(min-width:1200px){.home-cockpit{gap:.66rem}.home-kpi-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.home-kpi{min-height:84px;max-height:96px}.home-kpi b{font-size:.96rem}.home-watch-card{max-width:100%}.home-watch-head,.home-watch-row{grid-template-columns:.4rem 1fr 1.1fr .72fr .72fr .68fr}.home-watch-row{min-height:36px}}
-@media(min-width:1500px){.home-kpi-grid{grid-template-columns:repeat(6,minmax(0,1fr))}.home-kpi-opportunity{grid-column:auto}}
-
 </style>""",
         unsafe_allow_html=True,
     )

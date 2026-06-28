@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import html
-
 import streamlit as st
 from components.cards import empty_state
 from pages.opportunities import confidence, percent_score, risk, score
@@ -19,26 +17,25 @@ def _signal(ai_score: float, asset_risk: float, confidence_score: float) -> tupl
     return "Wait", "dot-wait"
 
 
-def _escape(value: object) -> str:
-    return html.escape(str(value), quote=True)
+def _render_kpi(label: str, value: str, help_text: str, delta: str | None = None) -> None:
+    with st.container(border=True):
+        st.metric(label=label, value=value, delta=delta, help=help_text)
+        st.caption(help_text)
 
 
-def _watchlist_row(asset: MarketAsset) -> str:
+def _render_watchlist_row(asset: MarketAsset) -> None:
     ai_score = score(asset)
     asset_risk = risk(asset)
     confidence_score = confidence(asset)
-    signal, dot_class = _signal(ai_score, asset_risk, confidence_score)
-    trend_class = "positive" if asset.price_change_24h_pct >= 0 else "negative"
-    return (
-        "<div class='home-watch-row'>"
-        f"<span class='status-dot {dot_class}'></span>"
-        f"<b>{_escape(asset.symbol)}</b>"
-        f"<span>{_escape(money(asset.current_price))}</span>"
-        f"<span class='{trend_class}'>{_escape(percent(asset.price_change_24h_pct))}</span>"
-        f"<span>{_escape(percent_score(ai_score))}</span>"
-        f"<span class='home-signal {dot_class}'>{_escape(signal)}</span>"
-        "</div>"
-    )
+    signal, _ = _signal(ai_score, asset_risk, confidence_score)
+    trend = percent(asset.price_change_24h_pct)
+    cols = st.columns([0.9, 1.4, 1, 1, 0.9], vertical_alignment="center")
+    cols[0].markdown(f"**{asset.symbol}**")
+    cols[1].caption(asset.name)
+    cols[2].markdown(money(asset.current_price))
+    cols[3].metric("24h", trend)
+    cols[4].metric("Score IA", percent_score(ai_score))
+    st.caption(f"Signal : {signal}")
 
 
 def render(services: dict[str, object]) -> None:
@@ -51,63 +48,55 @@ def render(services: dict[str, object]) -> None:
     binance_summary = bz.spot_portfolio(cg) if bz.configured else None
     has_binance_positions = bool(binance_summary and binance_summary.connected and binance_summary.positions)
     portfolio_label = money(binance_summary.total_value_usdt, "USDT") if has_binance_positions else "Indisponible"
-    safe_portfolio_label = _escape(portfolio_label)
     daily_pnl = binance_summary.pnl_24h_usdt if has_binance_positions and binance_summary and binance_summary.pnl_24h_usdt else 0
-    daily_pnl_class = "positive" if daily_pnl >= 0 else "negative"
     portfolio_message = "Total réel Binance Spot" if has_binance_positions else "Connectez Binance en lecture seule ou vérifiez que votre portefeuille Spot contient des actifs."
     avg_24h = sum(asset.price_change_24h_pct for asset in markets) / len(markets) if markets else 0
     ranked_opportunities = sorted(markets, key=score, reverse=True)[:3]
     avg_risk = sum(risk(asset) for asset in markets) / len(markets) if markets else 0
     avg_confidence = sum(confidence(asset) for asset in markets) / len(markets) if markets else 0
     top_opportunity = ranked_opportunities[0] if ranked_opportunities else None
-    market_class = "positive" if avg_24h >= 0 else "negative"
 
-    top_symbol = _escape(top_opportunity.symbol if top_opportunity else "—")
-    top_caption = _escape(top_opportunity.name if top_opportunity else "Aucune opportunité détectée")
-    watchlist_rows = "".join(_watchlist_row(asset) for asset in markets[:5]) or "<p class='muted'>Watchlist indisponible.</p>"
-    safe_app_subtitle = _escape(APP_SUBTITLE)
-    safe_home_title = _escape(HOME_TITLE)
-    safe_home_subtitle = _escape(HOME_SUBTITLE)
-    safe_portfolio_message = _escape(portfolio_message)
-    safe_daily_pnl = _escape(money(daily_pnl, "USDT"))
-    safe_market_trend = _escape(percent(avg_24h))
-    safe_fear_value = _escape(f"{fear.value}%" if fear.value is not None else "—")
-    safe_fear_label = _escape(fear.label)
-    safe_btc_dominance = _escape(f"{metrics.get('btc_dominance', 0):.1f}%")
+    top_symbol = top_opportunity.symbol if top_opportunity else "—"
+    top_caption = top_opportunity.name if top_opportunity else "Aucune opportunité détectée"
+    market_trend = percent(avg_24h)
+    fear_value = f"{fear.value}%" if fear.value is not None else "—"
+    btc_dominance = f"{metrics.get('btc_dominance', 0):.1f}%"
 
-    cockpit_html = f"""
-        <div class='home-cockpit'>
-            <section class='home-cockpit-head'>
-                <div>
-                    <span class='pill'>{safe_app_subtitle}</span>
-                    <h1>{safe_home_title}</h1>
-                </div>
-                <p class='muted'>{safe_home_subtitle}</p>
-            </section>
+    with st.container():
+        st.caption(APP_SUBTITLE)
+        st.title(HOME_TITLE)
+        st.caption(HOME_SUBTITLE)
 
-            <section class='home-kpi-grid' aria-label='Trading cockpit KPIs'>
-                <div class='home-kpi'><span>Portfolio</span><b>{safe_portfolio_label}</b><small>{safe_portfolio_message}</small></div>
-                <div class='home-kpi'><span>P&amp;L 24h</span><b class='{daily_pnl_class}'>{safe_daily_pnl}</b><small>Binance Spot</small></div>
-                <div class='home-kpi'><span>Risk</span><b>{avg_risk:.0f}%</b><small>Score agrégé</small></div>
-                <div class='home-kpi'><span>Confidence</span><b>{avg_confidence:.0f}%</b><small>Qualité données</small></div>
-                <div class='home-kpi'><span>Market Trend</span><b class='{market_class}'>{safe_market_trend}</b><small>Moyenne watchlist</small></div>
-                <div class='home-kpi'><span>Fear &amp; Greed</span><b>{safe_fear_value}</b><small>{safe_fear_label}</small></div>
-                <div class='home-kpi home-kpi-opportunity'><span>Top Opportunity</span><b>{top_symbol}</b><small>{top_caption}</small></div>
-                <div class='home-kpi'><span>BTC Dominance</span><b>{safe_btc_dominance}</b><small>Marché global</small></div>
-            </section>
+    kpi_rows = [
+        [
+            ("Portfolio", portfolio_label, portfolio_message, None),
+            ("P&L 24h", money(daily_pnl, "USDT"), "Binance Spot", None),
+            ("Risque", f"{avg_risk:.0f}%", "Score agrégé", None),
+            ("Confiance", f"{avg_confidence:.0f}%", "Qualité données", None),
+        ],
+        [
+            ("Tendance marché", market_trend, "Moyenne watchlist", None),
+            ("Fear & Greed", fear_value, fear.label, None),
+            ("Top opportunité", top_symbol, top_caption, None),
+            ("Dominance BTC", btc_dominance, "Marché global", None),
+        ],
+    ]
+    for row in kpi_rows:
+        for column, (label, value, help_text, delta) in zip(st.columns(4), row, strict=True):
+            with column:
+                _render_kpi(label, value, help_text, delta)
 
-            <section class='home-watch-card' aria-label='Compact watchlist'>
-                <div class='home-watch-title'>
-                    <div><span class='pill soft'>Watchlist</span><h3>Top 5 actifs</h3></div>
-                    <b class='{market_class}'>{safe_market_trend}</b>
-                </div>
-                <div class='home-watch-head'>
-                    <span></span><span>Symbol</span><span>Price</span><span>24h %</span><span>AI Score</span><span>Signal</span>
-                </div>
-                <div class='home-watch-list'>{watchlist_rows}</div>
-            </section>
-        </div>
-        """
-    st.markdown(cockpit_html, unsafe_allow_html=True)
+    with st.container(border=True):
+        title_col, trend_col = st.columns([3, 1], vertical_alignment="center")
+        title_col.subheader("Watchlist · Top 5 actifs")
+        trend_col.metric("Tendance", market_trend)
+        if markets:
+            header = st.columns([0.9, 1.4, 1, 1, 0.9], vertical_alignment="center")
+            for col, label in zip(header, ["Symbole", "Actif", "Prix", "24h", "IA"], strict=True):
+                col.caption(label)
+            for asset in markets[:5]:
+                _render_watchlist_row(asset)
+        else:
+            st.caption("Watchlist indisponible.")
     if not markets:
         empty_state("Données marché indisponibles", "Aucune donnée live n'a pu être chargée. Les pages restent accessibles avec des états vides élégants.")

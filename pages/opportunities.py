@@ -28,6 +28,25 @@ def score(asset: MarketAsset) -> float:
     return clamp(55 + momentum(asset) * 2.1 - risk(asset) * 0.35, 0, 100)
 
 
+def confidence(asset: MarketAsset) -> float:
+    data_points = 0
+    data_points += 1 if asset.current_price > 0 else 0
+    data_points += 1 if asset.total_volume > 0 else 0
+    data_points += 1 if asset.market_cap_rank > 0 else 0
+    data_points += 1 if asset.high_24h > 0 and asset.low_24h > 0 else 0
+    return clamp(45 + data_points * 12 - risk(asset) * 0.15, 0, 100)
+
+
+def recommendation(ai_score: float, asset_risk: float, confidence_score: float) -> str:
+    if confidence_score < 55:
+        return "Surveiller : données encore limitées"
+    if ai_score >= 70 and asset_risk < 50:
+        return "Accumulation prudente"
+    if ai_score >= 55 and asset_risk < 70:
+        return "Observer et attendre un bon point d’entrée"
+    return "Attendre confirmation"
+
+
 def render(services: dict[str, object]) -> None:
     cg = services["coingecko"]
     assert isinstance(cg, CoinGeckoService)
@@ -38,18 +57,21 @@ def render(services: dict[str, object]) -> None:
         empty_state("Aucune opportunité", "L'analyse reprendra automatiquement lorsque les prix seront disponibles.")
         return
 
-    st.markdown("<div class='card'><span class='pill'>Analyse éducative</span><p class='muted'>Classement basé sur score IA, momentum, risque et volatilité. Ceci n'est pas un conseil financier.</p></div>", unsafe_allow_html=True)
-    for asset in ranked[: max(3, min(5, len(ranked)))]:
+    st.markdown("<div class='card'><span class='pill'>Analyse éducative</span><p class='muted'>Top 3 généré depuis les données marché CoinGecko : score, risque, confiance et recommandation. Ceci n'est pas un conseil financier.</p></div>", unsafe_allow_html=True)
+    for asset in ranked[:3]:
         ai_score = score(asset)
         asset_risk = risk(asset)
         asset_vol = volatility(asset)
-        bias = "Accumulation prudente" if ai_score >= 65 and asset_risk < 55 else "Surveillance" if ai_score >= 50 else "Attendre confirmation"
+        confidence_score = confidence(asset)
+        bias = recommendation(ai_score, asset_risk, confidence_score)
         st.markdown(
             f"<div class='card'><div class='row'><div><h3>{html.escape(asset.name)}</h3>"
             f"<p class='muted'>{html.escape(asset.symbol)} · {html.escape(bias)}</p></div>"
             f"<div style='text-align:right'><b>{ai_score:.0f}/100</b><p class='muted'>{money(asset.current_price)}</p></div></div>"
-            f"<div class='metric'><div><span class='muted'>Momentum</span><b class='{ 'positive' if momentum(asset) >= 0 else 'negative' }'>{percent(momentum(asset))}</b></div>"
+            f"<div class='metric'><div><span class='muted'>Score</span><b>{ai_score:.0f}/100</b></div>"
             f"<div><span class='muted'>Risque</span><b>{asset_risk:.0f}/100</b></div>"
+            f"<div><span class='muted'>Confiance</span><b>{confidence_score:.0f}/100</b></div>"
+            f"<div><span class='muted'>Momentum</span><b class='{ 'positive' if momentum(asset) >= 0 else 'negative' }'>{percent(momentum(asset))}</b></div>"
             f"<div><span class='muted'>Volatilité</span><b>{asset_vol:.1f}%</b></div></div></div>",
             unsafe_allow_html=True,
         )

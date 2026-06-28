@@ -78,14 +78,14 @@ class BinanceService:
                 free = safe_float(row.get("free"))
                 locked = safe_float(row.get("locked"))
                 asset = str(row.get("asset", "")).upper().strip()
-                if asset and (free or locked):
+                if asset and free + locked > 0:
                     result.append(BinanceBalance(asset, free, locked))
             except (AttributeError, TypeError, ValueError):
                 continue
         return result
 
-    def spot_portfolio(self) -> BinancePortfolioSummary:
-        """Return Spot balances enriched with public USDT valuation when available."""
+    def spot_portfolio(self, coingecko: Any | None = None) -> BinancePortfolioSummary:
+        """Return Spot balances enriched with CoinGecko USDT valuation when available."""
         if not self.configured:
             return BinancePortfolioSummary([], 0.0)
         payload = self._signed_get("/api/v3/account")
@@ -99,11 +99,12 @@ class BinanceService:
                 free = safe_float(row.get("free"))
                 locked = safe_float(row.get("locked"))
                 asset = str(row.get("asset", "")).upper().strip()
-                if asset and (free or locked):
+                if asset and free + locked > 0:
                     balances.append(BinanceBalance(asset, free, locked))
             except (AttributeError, TypeError, ValueError):
                 continue
 
+        coingecko_prices = self._coingecko_prices(balances, coingecko) if balances else {}
         tickers = self._ticker_24h_by_symbol() if balances else {}
         positions: list[BinancePortfolioPosition] = []
         total_value = 0.0
@@ -111,7 +112,7 @@ class BinanceService:
         has_pnl = False
 
         for balance in balances:
-            price = self._price_usdt(balance.asset, tickers)
+            price = self._price_usdt(balance.asset, coingecko_prices)
             value = balance.total * price if price else 0.0
             pnl_pct = self._pnl_pct_24h(balance.asset, tickers)
             pnl_value = None
@@ -135,12 +136,20 @@ class BinanceService:
             return {}
         return {str(item.get("symbol", "")).upper(): item for item in payload if isinstance(item, dict)}
 
-    def _price_usdt(self, asset: str, tickers: dict[str, dict[str, Any]]) -> float:
+    def _coingecko_prices(self, balances: list[BinanceBalance], coingecko: Any | None) -> dict[str, float]:
+        if coingecko is None or not hasattr(coingecko, "prices_by_symbols"):
+            return {}
+        symbols = [balance.asset for balance in balances if balance.asset not in self.STABLE_USDT_PRICES]
+        try:
+            return coingecko.prices_by_symbols(symbols)
+        except Exception:
+            return {}
+
+    def _price_usdt(self, asset: str, coingecko_prices: dict[str, float]) -> float:
         asset = asset.upper()
         if asset in self.STABLE_USDT_PRICES:
             return self.STABLE_USDT_PRICES[asset]
-        ticker = tickers.get(f"{asset}USDT")
-        return safe_float(ticker.get("lastPrice")) if ticker else 0.0
+        return safe_float(coingecko_prices.get(asset))
 
     def _pnl_pct_24h(self, asset: str, tickers: dict[str, dict[str, Any]]) -> float | None:
         asset = asset.upper()

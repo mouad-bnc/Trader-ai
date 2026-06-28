@@ -17,15 +17,14 @@ def render(services: dict[str, object]) -> None:
     st.title("Portefeuille")
 
     if bz.configured:
-        summary = bz.spot_portfolio()
+        summary = bz.spot_portfolio(cg)
         if summary.connected:
             _render_binance_portfolio(summary)
         else:
             st.markdown("<div class='card hero'><span class='pill soft'>Connexion Binance indisponible</span><p class='muted'>Vérifiez les secrets Streamlit BINANCE_API_KEY et BINANCE_API_SECRET. Aucun secret n'est affiché.</p></div>", unsafe_allow_html=True)
     else:
-        markets = cg.get_markets()
-        summary = pf.summarize(pf.demo_holdings(), markets)
-        _render_manual_portfolio(summary, pf)
+        st.markdown("<div class='card hero'><span class='pill soft'>Binance non configuré</span><p class='muted'>Ajoutez BINANCE_API_KEY et BINANCE_API_SECRET aux secrets Streamlit pour afficher vos vrais soldes Spot en lecture seule.</p></div>", unsafe_allow_html=True)
+        empty_state("Aucun portefeuille Binance", "Aucune donnée fictive n’est affichée : connectez Binance en lecture seule pour synchroniser vos avoirs réels.")
 
 
 def _render_binance_portfolio(summary: BinancePortfolioSummary) -> None:

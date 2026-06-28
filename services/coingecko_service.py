@@ -83,6 +83,40 @@ class CoinGeckoService:
             return self._order_watchlist(assets, requested_ids)
         return self._binance_market_fallback(requested_ids) or self._static_market_fallback(requested_ids)
 
+    def prices_by_symbols(self, symbols: list[str], currency: str = "usd") -> dict[str, float]:
+        """Return CoinGecko spot prices keyed by uppercase symbol.
+
+        Binance balances expose asset symbols, while CoinGecko market prices are
+        easiest to request by symbol for a mixed exchange wallet. Values are
+        requested in USD and used as a USDT estimate in the UI.
+        """
+        unique_symbols = sorted({symbol.upper().strip() for symbol in symbols if symbol and symbol.upper().strip() not in {"USDT"}})
+        if not unique_symbols:
+            return {}
+        payload = self._get(
+            "/coins/markets",
+            {
+                "vs_currency": currency,
+                "symbols": ",".join(unique_symbols),
+                "include_tokens": "all",
+                "order": "market_cap_desc",
+                "per_page": min(max(len(unique_symbols) * 3, 1), 250),
+                "page": 1,
+                "locale": "fr",
+            },
+        )
+        prices: dict[str, float] = {}
+        if not isinstance(payload, list):
+            return prices
+        for item in payload:
+            if not isinstance(item, dict):
+                continue
+            symbol = str(item.get("symbol", "")).upper().strip()
+            price = safe_float(item.get("current_price"))
+            if symbol in unique_symbols and price > 0 and symbol not in prices:
+                prices[symbol] = price
+        return prices
+
     def trending(self) -> list[MarketAsset]:
         payload = self._get("/search/trending")
         coins = payload.get("coins", []) if isinstance(payload, dict) else []

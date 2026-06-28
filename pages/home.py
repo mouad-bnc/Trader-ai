@@ -92,7 +92,7 @@ def render(services: dict[str, object]) -> None:
     market_class = "positive" if avg_24h >= 0 else "negative"
     worst_label = f"{worst_asset.name} · {percent(worst_asset.price_change_24h_pct)}" if worst_asset else "Indisponible"
     chart_asset = best_asset or (markets[0] if markets else None)
-    chart_values = chart_asset.sparkline_7d if chart_asset else []
+    chart_values = chart_asset.sparkline if chart_asset else []
     chart_title = f"{chart_asset.name} · performance 7j" if chart_asset else "Performance portefeuille"
     chart_positive = (chart_values[-1] >= chart_values[0]) if len(chart_values) >= 2 else avg_24h >= 0
     chart_svg = sparkline(chart_values, chart_positive)

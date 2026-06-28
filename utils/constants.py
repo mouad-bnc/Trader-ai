@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-APP_NAME = "Mouad Capital AI"
+APP_NAME = "MSH AI-Invest"
 APP_SUBTITLE = "Your Intelligent Investment Copilot"
-HOME_TITLE = "Welcome to Mouad Capital AI"
+HOME_TITLE = "Welcome to MSH AI-Invest"
 HOME_SUBTITLE = "Professional investment intelligence platform"
-AI_PAGE_TITLE = "Mouad Capital AI Assistant"
-FOOTER_TEXT = "© 2026 Mouad Capital AI"
-APP_VERSION = "3.0"
+AI_PAGE_TITLE = "MSH AI-Invest Assistant"
+FOOTER_TEXT = "© 2026 MSH AI-Invest"
 DEFAULT_CURRENCY = "usd"
 NAV_ITEMS = ["Accueil", "Marchés", "Portefeuille", "Bots", "Actualités", "Calculateur", "Opportunités", "Assistant AI"]
-GOLD = "#F3BA2F"
-GREEN = "#02C076"
-RED = "#F6465D"
-BACKGROUND = "#0B0E11"
-SURFACE = "#181A20"
+GOLD = "#D4AF37"
+GREEN = "#2ECC71"
+RED = "#E74C3C"
+BACKGROUND = "#090909"
+SURFACE = "#111111"
 DEFAULT_SYMBOLS = ["bitcoin", "ethereum", "solana", "sui", "dogecoin", "ripple"]
 NEWS_QUERIES = ["crypto", "bitcoin", "ethereum", "binance", "blockchain"]

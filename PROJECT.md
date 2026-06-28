@@ -1,7 +1,7 @@
-# Mouad Capital AI — Project Guide
+# MSH AI-Invest — Project Guide
 
 ## Vision
-Mouad Capital AI est un copilote crypto personnel et non un exchange.
+MSH AI-Invest est un copilote crypto personnel et non un exchange.
 L'application aide l'utilisateur à analyser son portefeuille, comprendre le marché et identifier les opportunités.
 
 ## Stack technique

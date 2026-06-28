@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mouad-capital-ai"
 version = "2.0.0"
-description = "Mouad Capital AI V2, application crypto premium mobile-first en Streamlit."
+description = "MSH AI-Invest V2, application crypto premium mobile-first en Streamlit."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = ["streamlit>=1.36.0", "pandas>=2.2.0", "requests>=2.31.0"]

@@ -37,6 +37,46 @@ def confidence(asset: MarketAsset) -> float:
     return clamp(45 + data_points * 12 - risk(asset) * 0.15, 0, 100)
 
 
+def percent_score(value: float) -> str:
+    return f"{value:.0f} %"
+
+
+def positive_status(value: float) -> tuple[str, str, str]:
+    if value >= 85:
+        return "Excellent", "status-excellent", "progress-green"
+    if value >= 70:
+        return "Bon", "status-bon", "progress-green"
+    if value >= 50:
+        return "Moyen", "status-moyen", "progress-yellow"
+    if value >= 30:
+        return "À surveiller", "status-a-surveiller", "progress-orange"
+    return "Critique", "status-critique", "progress-red"
+
+
+def risk_status(value: float) -> tuple[str, str, str]:
+    if value <= 29:
+        return "Faible", "status-faible", "progress-green"
+    if value <= 49:
+        return "Modéré", "status-modere", "progress-yellow"
+    if value <= 69:
+        return "Élevé", "status-eleve", "progress-orange"
+    return "Très élevé", "status-tres-eleve", "progress-red"
+
+
+def indicator(label: str, value: float, *, risk_indicator: bool = False) -> str:
+    status, status_class, progress_class = risk_status(value) if risk_indicator else positive_status(value)
+    safe_label = html.escape(label)
+    safe_status = html.escape(status)
+    width = clamp(value, 0, 100)
+    return (
+        "<div>"
+        f"<div class='score-line'><span class='score-label'>{safe_label}</span><b class='score-value {status_class}'>{percent_score(value)}</b></div>"
+        f"<div class='progress {progress_class}' aria-label='{safe_label} {percent_score(value)}'><span style='width:{width:.0f}%'></span></div>"
+        f"<p class='muted {status_class}'>{safe_status}</p>"
+        "</div>"
+    )
+
+
 def recommendation(ai_score: float, asset_risk: float, confidence_score: float) -> str:
     if confidence_score < 55:
         return "Surveiller : données encore limitées"
@@ -67,10 +107,10 @@ def render(services: dict[str, object]) -> None:
         st.markdown(
             f"<div class='card'><div class='row'><div><h3>{html.escape(asset.name)}</h3>"
             f"<p class='muted'>{html.escape(asset.symbol)} · {html.escape(bias)}</p></div>"
-            f"<div style='text-align:right'><b>{ai_score:.0f}/100</b><p class='muted'>{money(asset.current_price)}</p></div></div>"
-            f"<div class='metric'><div><span class='muted'>Score</span><b>{ai_score:.0f}/100</b></div>"
-            f"<div><span class='muted'>Risque</span><b>{asset_risk:.0f}/100</b></div>"
-            f"<div><span class='muted'>Confiance</span><b>{confidence_score:.0f}/100</b></div>"
+            f"<div style='text-align:right'><b>{percent_score(ai_score)}</b><p class='muted'>{money(asset.current_price)}</p></div></div>"
+            f"<div class='metric'>{indicator('Score', ai_score)}"
+            f"{indicator('Risque', asset_risk, risk_indicator=True)}"
+            f"{indicator('Confiance', confidence_score)}"
             f"<div><span class='muted'>Momentum</span><b class='{ 'positive' if momentum(asset) >= 0 else 'negative' }'>{percent(momentum(asset))}</b></div>"
             f"<div><span class='muted'>Volatilité</span><b>{asset_vol:.1f}%</b></div></div></div>",
             unsafe_allow_html=True,

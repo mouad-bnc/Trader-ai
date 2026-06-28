@@ -13,7 +13,7 @@ from services.binance_service import BinanceService
 from services.coingecko_service import CoinGeckoService
 from services.news_service import NewsService
 from services.portfolio_service import PortfolioService
-from utils.constants import APP_NAME, NAV_ITEMS
+from utils.constants import APP_NAME
 
 from pages import assistant, bots, calculator, home, markets, news, opportunities, portfolio
 
@@ -67,8 +67,8 @@ def main() -> None:
     st.set_page_config(page_title=APP_NAME, page_icon="✦", layout="wide", initial_sidebar_state="collapsed")
     apply_theme()
     services = load_services()
+    render_header()
     page = selected_page()
-    render_header(page, NAV_ITEMS)
     routes = page_renderers()
     routes.get(page, routes["Accueil"])(services)
     render_footer()

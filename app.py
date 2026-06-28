@@ -53,7 +53,11 @@ def page_renderers() -> dict[str, PageRenderer]:
 def load_services() -> dict[str, object]:
     return {
         "coingecko": CoinGeckoService(),
-        "binance": BinanceService(secret_value("BINANCE_API_KEY"), secret_value("BINANCE_API_SECRET")),
+        "binance": BinanceService(
+            secret_value("BINANCE_API_KEY"),
+            secret_value("BINANCE_API_SECRET"),
+            secret_value("BINANCE_BASE_URL"),
+        ),
         "news": NewsService(),
         "portfolio": PortfolioService(),
     }

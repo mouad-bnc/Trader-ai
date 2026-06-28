@@ -75,28 +75,34 @@ class BinancePortfolioSummary:
 
 
 class BinanceService:
-    """Read-only Binance account synchronization across wallet families."""
+    """Read-only Binance Spot account synchronization."""
+
+    DEFAULT_BASE_URL = "https://api.binance.com"
+    ALLOWED_BASE_URLS = {
+        "https://api.binance.com",
+        "https://api1.binance.com",
+        "https://api2.binance.com",
+        "https://api3.binance.com",
+        "https://data.binance.com",
+    }
 
     STABLE_USDT_PRICES = {"USDT": 1.0, "USDC": 1.0, "BUSD": 1.0, "FDUSD": 1.0, "TUSD": 1.0, "DAI": 1.0}
 
     READ_ONLY_ENDPOINTS: dict[str, tuple[str, str]] = {
         "Spot": ("GET", "/api/v3/account"),
-        "Funding": ("POST", "/sapi/v1/asset/get-funding-asset"),
-        "Simple Earn": ("GET", "/sapi/v1/simple-earn/account"),
-        "Flexible Earn": ("GET", "/sapi/v1/simple-earn/flexible/position"),
-        "Locked Earn": ("GET", "/sapi/v1/simple-earn/locked/position"),
-        "Futures": ("GET", "/fapi/v3/balance"),
-        "Margin": ("GET", "/sapi/v1/margin/account"),
-        "Trading Bots": ("GET", "/sapi/v1/algo/spot/openOrders"),
     }
 
-    def __init__(self, api_key: str | None = None, api_secret: str | None = None, base_url: str = "https://api.binance.com", timeout: int = 8) -> None:
+    def __init__(self, api_key: str | None = None, api_secret: str | None = None, base_url: str | None = None, timeout: int = 8) -> None:
         self.api_key = (api_key or "").strip()
         self.api_secret = (api_secret or "").strip()
-        self.base_url = base_url.rstrip("/")
+        self.base_url = self._normalize_base_url(base_url)
         self.timeout = timeout
         self._server_time_offset_ms: int | None = None
         self.last_debug: dict[str, Any] = self._debug_template()
+
+    def _normalize_base_url(self, base_url: str | None) -> str:
+        candidate = (base_url or self.DEFAULT_BASE_URL).strip().rstrip("/")
+        return candidate if candidate in self.ALLOWED_BASE_URLS else self.DEFAULT_BASE_URL
 
     @property
     def configured(self) -> bool:
@@ -126,9 +132,11 @@ class BinanceService:
 
         for wallet, (method, path) in self.READ_ONLY_ENDPOINTS.items():
             payload, call_debug = self._signed_request(method, path, self._endpoint_params(wallet))
-            endpoint_status[wallet] = {"status_code": call_debug.get("status_code"), "error": call_debug.get("error")}
+            message = str(call_debug.get("error") or self._safe_error_message(payload, call_debug.get("status_code")))
+            endpoint_status[wallet] = {"status_code": call_debug.get("status_code"), "error": "" if call_debug.get("status_code") == 200 else message}
+            debug["status_code"] = call_debug.get("status_code")
+            debug["error"] = "" if call_debug.get("status_code") == 200 else message
             if call_debug.get("status_code") != 200:
-                message = str(call_debug.get("error") or self._safe_error_message(payload, call_debug.get("status_code")))
                 warnings.append(f"{wallet}: {message}")
                 continue
             balances.extend(self._parse_wallet_balances(wallet, payload))
@@ -356,7 +364,7 @@ class BinanceService:
         return hmac.new(self.api_secret.encode(), urlencode(query).encode(), hashlib.sha256).hexdigest()
 
     def _debug_template(self) -> dict[str, Any]:
-        return {**self.secrets_status(), "status_code": None, "error": "", "balances_returned": 0, "non_zero_balances": 0, "detected_symbols": []}
+        return {**self.secrets_status(), "base_url": self.base_url, "status_code": None, "error": "", "balances_returned": 0, "non_zero_balances": 0, "detected_symbols": []}
 
     def _safe_error_message(self, payload: Any, status_code: Any) -> str:
         if isinstance(payload, dict):

@@ -34,6 +34,7 @@ def render(services: dict[str, object]) -> None:
 
 def _render_binance_debug_panel(debug: dict[str, object]) -> None:
     """Safe diagnostics for Binance read-only synchronization."""
+    base_url = html.escape(str(debug.get("base_url") or "https://api.binance.com"))
     status_code = debug.get("status_code") if debug.get("status_code") is not None else "Indisponible"
     error_message = html.escape(str(debug.get("error") or "Aucune"))
     detected_symbols = debug.get("detected_symbols")
@@ -42,6 +43,7 @@ def _render_binance_debug_panel(debug: dict[str, object]) -> None:
     symbols_label = ", ".join(html.escape(str(symbol)) for symbol in detected_symbols[:5]) or "Aucun"
 
     with st.expander("Diagnostic Binance sécurisé", expanded=False):
+        st.write(f"URL de base utilisée : {base_url}")
         st.write(f"API Key présente : {'Oui' if debug.get('api_key_present') else 'Non'}")
         st.write(f"API Secret présent : {'Oui' if debug.get('api_secret_present') else 'Non'}")
         st.write(f"Status HTTP Binance : {status_code}")
@@ -67,7 +69,7 @@ def _render_binance_portfolio(summary: BinancePortfolioSummary) -> None:
         f"<p class='{pnl_class}'>{html.escape(pnl_label)}</p>"
         f"<p class='muted'>{html.escape(summary.status_message)}</p>"
         f"<p class='muted'>Dernière synchronisation: {html.escape(last_sync)}</p>"
-        f"<p class='muted'>Spot · Funding · Earn · Futures · Margin lecture seule · Aucun endpoint de trading, transfert ou retrait.</p></div>",
+        f"<p class='muted'>Spot Binance lecture seule · Aucun endpoint de trading, transfert ou retrait.</p></div>",
         unsafe_allow_html=True,
     )
 

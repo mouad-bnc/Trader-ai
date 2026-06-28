@@ -21,6 +21,16 @@ streamlit run app.py
 Les intégrations externes sont protégées : l'application affiche des états vides si les API sont indisponibles.
 
 
+## Secrets Streamlit
+
+Configurez Binance en lecture seule dans les secrets Streamlit. `BINANCE_BASE_URL` est optionnel et revient à `https://api.binance.com` s'il est absent ou invalide. Valeurs acceptées : `https://api.binance.com`, `https://api1.binance.com`, `https://api2.binance.com`, `https://api3.binance.com`, `https://data.binance.com`.
+
+```toml
+BINANCE_API_KEY = "votre_api_key"
+BINANCE_API_SECRET = "votre_api_secret"
+BINANCE_BASE_URL = "https://api1.binance.com"
+```
+
 ## Branding
 
 - Application name: Mouad Capital AI

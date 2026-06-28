@@ -16,17 +16,17 @@ def render(services: dict[str, object]) -> None:
     pf = services["portfolio"]
     bz = services.get("binance")
     assert isinstance(cg, CoinGeckoService) and isinstance(pf, PortfolioService)
-    st.title(AI_PAGE_TITLE)
+    st.markdown(f"<div class='dashboard-micro-title'><div><span class='pill'>Assistant AI</span><h1>{AI_PAGE_TITLE}</h1></div><span class='muted'>Question en haut · réponse compacte</span></div>", unsafe_allow_html=True)
     markets = cg.get_markets()
     binance_summary = bz.spot_portfolio() if isinstance(bz, BinanceService) and bz.configured else None
     summary = pf.summarize(pf.demo_holdings(), markets)
     portfolio_value = binance_summary.total_value_usdt if binance_summary and binance_summary.connected and binance_summary.positions else summary.total_value
     positions_count = len(binance_summary.positions) if binance_summary and binance_summary.connected else len(summary.positions)
 
-    st.markdown("<div class='card'><span class='pill'>Assistant contextuel</span><p class='muted'>Réponses en français, éducatives uniquement, basées sur le portefeuille disponible et les données marché chargées.</p></div>", unsafe_allow_html=True)
+    st.markdown("<div class='cockpit-card-sm'><span class='pill'>Assistant contextuel</span><p class='muted'>Réponses en français, éducatives uniquement, basées sur le portefeuille disponible et les données marché chargées.</p></div>", unsafe_allow_html=True)
     prompt = st.text_input("Votre question", placeholder="Analyse mon portefeuille et le risque actuel")
     if not prompt:
-        st.markdown("<div class='card'><b>Suggestions rapides</b><p class='muted'>Analyse portefeuille · Risque BTC · Opportunités · Résumé marché</p></div>", unsafe_allow_html=True)
+        st.markdown("<div class='cockpit-card-sm'><b>Suggestions rapides</b><p class='muted'>Analyse portefeuille · Risque BTC · Opportunités · Résumé marché</p></div>", unsafe_allow_html=True)
         return
 
     prompt_l = prompt.lower()
@@ -46,4 +46,4 @@ def render(services: dict[str, object]) -> None:
         lines.append("Les données marché live sont indisponibles; l'analyse reste limitée au portefeuille local et doit être réévaluée quand les API reviennent.")
     lines.append("Ceci est une information éducative, pas un conseil financier.")
     response = " ".join(lines)
-    st.markdown(f"<div class='card hero'><h3>Réponse MSH AI-Invest</h3><p>{html.escape(response)}</p></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='cockpit-card'><h3>Réponse MSH AI-Invest</h3><p>{html.escape(response)}</p></div>", unsafe_allow_html=True)

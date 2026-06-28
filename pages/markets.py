@@ -11,12 +11,12 @@ from services.coingecko_service import CoinGeckoService
 def render(services: dict[str, object]) -> None:
     cg = services["coingecko"]
     assert isinstance(cg, CoinGeckoService)
-    st.title("Marchés")
+    st.markdown("<div class='dashboard-micro-title'><div><span class='pill'>Marchés</span><h1>Marchés</h1></div><span class='muted'>Vue compacte multi-actifs</span></div>", unsafe_allow_html=True)
     markets = cg.get_markets()
     gainers, losers = cg.top_gainers_losers(markets)
     _render_watchlist_ui(markets)
     metrics = cg.global_metrics()
-    st.markdown(f"<div class='card'><div class='metric'><div><span class='muted'>Dominance BTC</span><b>{metrics.get('btc_dominance',0):.1f}%</b></div><div><span class='muted'>Marché 24h</span><b>{metrics.get('market_cap_change_24h',0):+.2f}%</b></div><div><span class='muted'>Watchlist</span><b>{len(markets)}</b></div></div></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='cockpit-card-sm'><div class='metric'><div><span class='muted'>Dominance BTC</span><b>{metrics.get('btc_dominance',0):.1f}%</b></div><div><span class='muted'>Marché 24h</span><b>{metrics.get('market_cap_change_24h',0):+.2f}%</b></div><div><span class='muted'>Watchlist</span><b>{len(markets)}</b></div></div></div>", unsafe_allow_html=True)
     if not markets:
         empty_state("Marchés hors ligne", "CoinGecko est indisponible ou limité. Réessayez plus tard.")
         return
@@ -27,7 +27,7 @@ def render(services: dict[str, object]) -> None:
         focus = markets[0] if markets else None
         if focus:
             values = focus.sparkline if selected_range == "7D" and len(focus.sparkline) > 1 else cg.history(focus.id, ranges[selected_range])
-            range_chart(f"Graphique interactif {focus.name}", values, selected_range)
+            range_chart(f"Graphique compact {focus.name}", values, selected_range)
         else:
             empty_state("Graphique indisponible", "Données insuffisantes pour afficher ce graphique.")
         st.markdown("<div class='market-grid'>" + "".join(asset_card_html(asset) for asset in markets) + "</div>", unsafe_allow_html=True)

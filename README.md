@@ -29,3 +29,44 @@ Les intégrations externes sont protégées : l'application affiche des états v
 - Home page subtitle: Professional investment intelligence platform
 - AI page title: Mouad Capital AI Assistant
 - Footer: © 2026 Mouad Capital AI
+
+## Validation
+
+Use these checks after conflict resolution or dependency updates to confirm the Streamlit app still imports and starts successfully:
+
+```bash
+python - <<'PY'
+import importlib
+modules = [
+    'app',
+    'components.cards',
+    'components.charts',
+    'components.footer',
+    'components.header',
+    'components.navigation',
+    'components.theme',
+    'pages.assistant',
+    'pages.bots',
+    'pages.calculator',
+    'pages.home',
+    'pages.markets',
+    'pages.news',
+    'pages.opportunities',
+    'pages.portfolio',
+    'services.binance_service',
+    'services.coingecko_service',
+    'services.news_service',
+    'services.portfolio_service',
+    'utils.cache',
+    'utils.constants',
+    'utils.helpers',
+]
+for name in modules:
+    importlib.import_module(name)
+    print(f'OK {name}')
+PY
+```
+
+```bash
+timeout 15s streamlit run app.py --server.headless true --server.port 8501 --server.address 127.0.0.1
+```

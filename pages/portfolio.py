@@ -18,30 +18,37 @@ def render(services: dict[str, object]) -> None:
 
     if bz.configured:
         summary = bz.spot_portfolio(cg)
-        _render_binance_debug_panel(summary.debug)
         if summary.connected:
             _render_binance_portfolio(summary)
         else:
             message = html.escape(summary.status_message or "Vérifiez les secrets Streamlit BINANCE_API_KEY et BINANCE_API_SECRET. Aucun secret n'est affiché.")
             st.markdown(f"<div class='card hero'><span class='pill soft'>Connexion Binance indisponible</span><p class='muted'>{message}</p></div>", unsafe_allow_html=True)
+            _render_binance_debug_panel(summary.debug)
             _render_manual_portfolio(pf.summarize([]), pf)
     else:
-        _render_binance_debug_panel(bz.last_debug)
         st.markdown("<div class='card hero'><span class='pill soft'>Binance non configuré</span><p class='muted'>Ajoutez BINANCE_API_KEY et BINANCE_API_SECRET aux secrets Streamlit pour afficher vos vrais soldes Spot en lecture seule.</p></div>", unsafe_allow_html=True)
         empty_state("Aucun portefeuille Binance", "Aucune donnée fictive n’est affichée : connectez Binance en lecture seule pour synchroniser vos avoirs réels.")
+        _render_binance_debug_panel(bz.last_debug)
         _render_manual_portfolio(pf.summarize([]), pf)
 
 
 def _render_binance_debug_panel(debug: dict[str, object]) -> None:
-    """Temporary safe diagnostics for Binance read-only synchronization."""
-    with st.expander("Réglages · debug Binance sécurisé", expanded=False):
-        st.write(f"API key present: {'oui' if debug.get('api_key_present') else 'non'}")
-        st.write(f"API secret present: {'oui' if debug.get('api_secret_present') else 'non'}")
-        st.write(f"Binance status code: {debug.get('status_code') if debug.get('status_code') is not None else 'indisponible'}")
-        st.write(f"Number of balances returned: {debug.get('balances_returned', 0)}")
-        st.write(f"Number of non-zero balances: {debug.get('non_zero_balances', 0)}")
-        if debug.get("error"):
-            st.write(f"Erreur: {html.escape(str(debug.get('error')))}")
+    """Safe diagnostics for Binance read-only synchronization."""
+    status_code = debug.get("status_code") if debug.get("status_code") is not None else "Indisponible"
+    error_message = html.escape(str(debug.get("error") or "Aucune"))
+    detected_symbols = debug.get("detected_symbols")
+    if not isinstance(detected_symbols, list):
+        detected_symbols = []
+    symbols_label = ", ".join(html.escape(str(symbol)) for symbol in detected_symbols[:5]) or "Aucun"
+
+    with st.expander("Diagnostic Binance sécurisé", expanded=False):
+        st.write(f"API Key présente : {'Oui' if debug.get('api_key_present') else 'Non'}")
+        st.write(f"API Secret présent : {'Oui' if debug.get('api_secret_present') else 'Non'}")
+        st.write(f"Status HTTP Binance : {status_code}")
+        st.write(f"Message d'erreur Binance : {error_message}")
+        st.write(f"Nombre de balances reçues : {debug.get('balances_returned', 0)}")
+        st.write(f"Nombre de balances non nulles : {debug.get('non_zero_balances', 0)}")
+        st.write(f"5 premiers symboles détectés : {symbols_label}")
 
 
 def _render_binance_portfolio(summary: BinancePortfolioSummary) -> None:
@@ -60,7 +67,8 @@ def _render_binance_portfolio(summary: BinancePortfolioSummary) -> None:
     )
 
     if not summary.positions:
-        empty_state("Aucun solde Spot", "Binance est connecté en lecture seule, mais aucun solde non nul n'a été trouvé.")
+        empty_state("Synchronisation Binance vide", "Binance est connecté en lecture seule, mais aucun solde non nul n'a été trouvé.")
+        _render_binance_debug_panel(summary.debug)
         return
 
     for pos in summary.positions:
